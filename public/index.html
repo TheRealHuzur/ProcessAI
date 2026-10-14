@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ProzessPilot</title>
+  <meta name="description" content="Prozess erzählen, Knopf drücken, BPMN-Modell bekommen.">
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%230b162a'/%3E%3Cpath d='M18 46 L32 14 L46 46 L32 38 Z' fill='%230ea5e9'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="vendor/bpmn-js/diagram-js.css">
+  <link rel="stylesheet" href="vendor/bpmn-js/bpmn-js.css">
+  <link rel="stylesheet" href="vendor/bpmn-js/bpmn-embedded.css">
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="site-header">
+      <div class="brand" aria-label="ProzessPilot">
+        <span class="brand-dark">Prozess</span><span class="brand-accent">Pilot</span>
+        <span class="brand-badge">Entwurf 0.1</span>
+      </div>
+      <div class="toolbar" aria-label="Werkzeugleiste">
+        <button class="btn btn-secondary" id="btn-prozesse" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"></path></svg>
+          <span class="btn-label">Meine Prozesse</span>
+        </button>
+        <button class="btn btn-secondary" id="btn-neu" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"></path></svg>
+          <span class="btn-label">Neu</span>
+        </button>
+        <button class="btn btn-secondary" id="btn-oeffnen" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 16V5"></path><path d="M7 10l5-5 5 5"></path><path d="M5 19h14"></path></svg>
+          <span class="btn-label">Öffnen</span>
+        </button>
+        <button class="btn btn-primary" id="btn-speichern" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h11l3 3v13H5z"></path><path d="M8 4v5h7V4"></path><path d="M8 20v-6h8v6"></path></svg>
+          <span class="btn-label">Speichern</span>
+        </button>
+        <button class="btn btn-secondary" id="btn-export" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v11"></path><path d="M7 12l5 5 5-5"></path><path d="M5 19h14"></path></svg>
+          <span class="btn-label">.bpmn</span>
+        </button>
+        <button class="btn btn-secondary" id="btn-svg" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2"></rect><circle cx="9" cy="10" r="1.5"></circle><path d="M20 15l-4.5-4.5L8 18"></path></svg>
+          <span class="btn-label">SVG</span>
+        </button>
+        <button class="btn btn-ghost" id="btn-abmelden" type="button" title="Abmelden">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4h4v16h-4"></path><path d="M10 8l-4 4 4 4"></path><path d="M6 12h10"></path></svg>
+        </button>
+      </div>
+    </header>
+
+    <main class="app-main">
+      <aside class="panel panel-erfassen" aria-label="Prozess erfassen">
+        <div class="panel-block">
+          <label class="field-label" for="prozessname">Name des Prozesses</label>
+          <input class="input" id="prozessname" type="text" placeholder="z. B. Antrag auf Wohngeld bearbeiten" autocomplete="off">
+        </div>
+
+        <div class="panel-block mic-block">
+          <button class="mic-button" id="btn-mikro" type="button" aria-pressed="false">
+            <span class="mic-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0"></path><path d="M12 18v3"></path></svg>
+            </span>
+            <span class="mic-text" id="mikro-text">Einsprechen</span>
+          </button>
+          <p class="mic-status" id="mikro-status">Erzähl den Prozess einfach so, wie du ihn jemandem erklären würdest.</p>
+        </div>
+
+        <div class="panel-block grow">
+          <label class="field-label" for="quelltext">Prozessbeschreibung <span class="muted" id="quelltext-zaehler"></span></label>
+          <textarea class="input textarea" id="quelltext" placeholder="Hier landet, was du einsprichst. Du kannst auch tippen oder einfügen und alles korrigieren, bevor das Modell entsteht."></textarea>
+        </div>
+
+        <div class="panel-block">
+          <label class="field-label" for="modell">KI-Modell</label>
+          <select class="input" id="modell"></select>
+        </div>
+
+        <div class="panel-block">
+          <button class="btn btn-primary btn-big" id="btn-erzeugen" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"></path><path d="M13 6l6 6-6 6"></path></svg>
+            Modell erzeugen
+          </button>
+          <p class="progress" id="fortschritt" hidden></p>
+        </div>
+
+        <section class="panel-block ergebnis" id="ergebnis" hidden aria-live="polite">
+          <h2 class="ergebnis-titel">Regelcheck</h2>
+          <p class="ergebnis-zusammenfassung" id="ergebnis-zusammenfassung"></p>
+          <ul class="befund-liste" id="liste-fehler"></ul>
+          <ul class="befund-liste" id="liste-hinweise"></ul>
+          <div id="block-unklarheiten" hidden>
+            <h3 class="ergebnis-untertitel">Fragen der KI</h3>
+            <ul class="befund-liste" id="liste-unklarheiten"></ul>
+          </div>
+          <div id="block-nicht-modelliert" hidden>
+            <h3 class="ergebnis-untertitel">Nicht im Modell, aber erzählt</h3>
+            <ul class="befund-liste" id="liste-nicht-modelliert"></ul>
+          </div>
+        </section>
+
+        <p class="leitsatz">Die KI entwirft, du prüfst und gibst frei.</p>
+      </aside>
+
+      <section class="editor" aria-label="BPMN-Editor">
+        <div class="editor-bar">
+          <div class="mode-toggle" role="group" aria-label="BPMN-Symbolumfang" id="mode-toggle"></div>
+          <span class="editor-status" id="editor-status"></span>
+        </div>
+        <div class="canvas-wrap">
+          <div id="canvas" aria-label="BPMN-Arbeitsbereich"></div>
+          <div class="leer-hinweis" id="leer-hinweis">
+            <div class="leer-karte">
+              <p class="leer-titel">Hier erscheint dein Prozessmodell.</p>
+              <p>Links einsprechen oder Text eingeben und auf <strong>Modell erzeugen</strong> klicken.</p>
+              <button class="btn btn-ghost" id="btn-selbst-zeichnen" type="button">Lieber selbst zeichnen</button>
+            </div>
+          </div>
+          <aside class="panel-element" id="panel-element" hidden aria-label="Ausgewähltes Element">
+            <div class="panel-element-kopf">
+              <span class="element-typ" id="element-typ"></span>
+              <button class="btn btn-ghost btn-icon" id="btn-element-schliessen" type="button" aria-label="Schließen">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+              </button>
+            </div>
+            <label class="field-label" for="element-name">Name</label>
+            <input class="input" id="element-name" type="text" autocomplete="off">
+            <label class="field-label" for="element-beschreibung">Beschreibung / Arbeitshilfe</label>
+            <textarea class="input textarea textarea-klein" id="element-beschreibung" placeholder="Was mache ich in diesem Schritt eigentlich? Steht im BPMN-Beschreibungsfeld und reist beim Export mit."></textarea>
+            <p class="muted klein" id="element-id"></p>
+          </aside>
+        </div>
+      </section>
+    </main>
+
+    <div id="toast-container" aria-live="polite" aria-atomic="true"></div>
+  </div>
+
+  <dialog class="dialog" id="dialog-prozesse">
+    <div class="dialog-kopf">
+      <h2>Meine Prozesse</h2>
+      <button class="btn btn-ghost btn-icon" type="button" data-close aria-label="Schließen">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+      </button>
+    </div>
+    <ul class="prozess-liste" id="prozess-liste"></ul>
+  </dialog>
+
+  <dialog class="dialog dialog-login" id="dialog-login">
+    <form id="form-login" method="dialog">
+      <div class="brand brand-login"><span class="brand-dark">Prozess</span><span class="brand-accent">Pilot</span></div>
+      <label class="field-label" for="login-passwort">Passwort</label>
+      <input class="input" id="login-passwort" type="password" autocomplete="current-password" required>
+      <p class="login-fehler" id="login-fehler" hidden></p>
+      <button class="btn btn-primary btn-big" type="submit">Anmelden</button>
+    </form>
+  </dialog>
+
+  <input id="file-input" type="file" accept=".bpmn,.xml" hidden>
+
+  <script src="vendor/bpmn-js/bpmn-modeler.production.min.js"></script>
+  <script src="editor.js"></script>
+  <script src="spracherkennung.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

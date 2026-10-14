@@ -1,0 +1,22 @@
+{
+  "name": "prozesspilot",
+  "version": "0.1.0",
+  "description": "ProzessPilot: Prozess erzählen, Knopf drücken, BPMN-Modell bekommen. Arbeitstitel im Repo: ProcessAI.",
+  "private": true,
+  "type": "module",
+  "main": "server/index.js",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "scripts": {
+    "start": "node --no-warnings=ExperimentalWarning server/index.js",
+    "test": "node --no-warnings=ExperimentalWarning --test \"test/**/*.test.js\""
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  },
+  "devDependencies": {
+    "bpmn-moddle": "^9.0.1"
+  },
+  "license": "MIT"
+}

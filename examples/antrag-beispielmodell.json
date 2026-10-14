@@ -1,0 +1,51 @@
+{
+  "prozessname": "Antrag bearbeiten",
+  "pool": "Musterverwaltung",
+  "rollen": [
+    { "id": "Rolle_Poststelle", "name": "Poststelle" },
+    { "id": "Rolle_Sachbearbeitung", "name": "Sachbearbeitung" }
+  ],
+  "externe": [
+    { "id": "Extern_Antragstellende", "name": "Antragstellende" }
+  ],
+  "elemente": [
+    { "id": "Start_AntragEingegangen", "typ": "start", "art": "nachricht", "name": "Antrag ist eingegangen", "rolle": "Rolle_Poststelle" },
+    { "id": "Task_AntragErfassen", "typ": "aufgabe", "name": "Antrag erfassen", "rolle": "Rolle_Poststelle" },
+    { "id": "Gateway_Zusammen", "typ": "xor", "name": "", "rolle": "Rolle_Sachbearbeitung" },
+    { "id": "Task_AntragPruefen", "typ": "aufgabe", "name": "Antrag prüfen", "rolle": "Rolle_Sachbearbeitung" },
+    { "id": "Gateway_Vollstaendig", "typ": "xor", "name": "", "rolle": "Rolle_Sachbearbeitung" },
+    { "id": "Task_UnterlagenNachfordern", "typ": "aufgabe", "name": "Unterlagen nachfordern", "rolle": "Rolle_Sachbearbeitung" },
+    { "id": "Gateway_Warten", "typ": "ereignisgateway", "name": "", "rolle": "Rolle_Sachbearbeitung" },
+    { "id": "Event_UnterlagenEingegangen", "typ": "zwischen", "art": "nachricht", "name": "Unterlagen sind eingegangen", "rolle": "Rolle_Sachbearbeitung" },
+    { "id": "Event_FristAbgelaufen", "typ": "zwischen", "art": "zeit", "name": "Frist ist abgelaufen", "rolle": "Rolle_Sachbearbeitung" },
+    { "id": "End_AntragAbgelehnt", "typ": "ende", "art": "unbestimmt", "name": "Antrag ist abgelehnt", "rolle": "Rolle_Sachbearbeitung" },
+    { "id": "Task_BescheidErstellen", "typ": "aufgabe", "name": "Bescheid erstellen", "rolle": "Rolle_Sachbearbeitung", "beschreibung": "Vorlage aus dem Fachverfahren verwenden." },
+    { "id": "End_BescheidVersendet", "typ": "ende", "art": "nachricht", "name": "Bescheid ist versendet", "rolle": "Rolle_Sachbearbeitung" }
+  ],
+  "fluesse": [
+    { "id": "Flow_1", "von": "Start_AntragEingegangen", "nach": "Task_AntragErfassen" },
+    { "id": "Flow_2", "von": "Task_AntragErfassen", "nach": "Gateway_Zusammen" },
+    { "id": "Flow_3", "von": "Gateway_Zusammen", "nach": "Task_AntragPruefen" },
+    { "id": "Flow_4", "von": "Task_AntragPruefen", "nach": "Gateway_Vollstaendig" },
+    { "id": "Flow_5", "von": "Gateway_Vollstaendig", "nach": "Task_BescheidErstellen", "name": "vollständig" },
+    { "id": "Flow_6", "von": "Gateway_Vollstaendig", "nach": "Task_UnterlagenNachfordern", "name": "unvollständig" },
+    { "id": "Flow_7", "von": "Task_UnterlagenNachfordern", "nach": "Gateway_Warten" },
+    { "id": "Flow_8", "von": "Gateway_Warten", "nach": "Event_UnterlagenEingegangen" },
+    { "id": "Flow_9", "von": "Gateway_Warten", "nach": "Event_FristAbgelaufen" },
+    { "id": "Flow_10", "von": "Event_UnterlagenEingegangen", "nach": "Gateway_Zusammen" },
+    { "id": "Flow_11", "von": "Event_FristAbgelaufen", "nach": "End_AntragAbgelehnt" },
+    { "id": "Flow_12", "von": "Task_BescheidErstellen", "nach": "End_BescheidVersendet" }
+  ],
+  "nachrichten": [
+    { "id": "Msg_Antrag", "von": "Extern_Antragstellende", "nach": "Start_AntragEingegangen", "name": "Antrag" },
+    { "id": "Msg_Nachforderung", "von": "Task_UnterlagenNachfordern", "nach": "Extern_Antragstellende", "name": "Nachforderung" },
+    { "id": "Msg_Unterlagen", "von": "Extern_Antragstellende", "nach": "Event_UnterlagenEingegangen", "name": "Unterlagen" },
+    { "id": "Msg_Bescheid", "von": "End_BescheidVersendet", "nach": "Extern_Antragstellende", "name": "Bescheid" }
+  ],
+  "daten": [
+    { "id": "Data_Antrag", "typ": "datenobjekt", "name": "Antrag [erfasst]", "rolle": "Rolle_Poststelle", "lesen": [], "schreiben": ["Task_AntragErfassen"] },
+    { "id": "Store_Fachverfahren", "typ": "datenspeicher", "name": "Fachverfahren", "rolle": "Rolle_Sachbearbeitung", "lesen": ["Task_AntragPruefen"], "schreiben": [] }
+  ],
+  "unklarheiten": ["Wie lang ist die Frist für das Nachreichen von Unterlagen?"],
+  "nicht_modelliert": []
+}
