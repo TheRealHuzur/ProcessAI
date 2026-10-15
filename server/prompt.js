@@ -57,10 +57,10 @@ ARBEITSWEISE
 - Bringe die Schritte in die fachlich richtige Reihenfolge, auch wenn sie anders erzählt wurden.
 - Personen werden immer als Rolle modelliert, nie mit Namen (aus "Frau Müller aus der Kasse" wird z. B. "Kasse").
 - Jede beteiligte Rolle des eigenen Hauses bekommt eine Schwimmbahn (rollen). Externe Beteiligte (Bürgerinnen und Bürger, Antragstellende, andere Behörden, Firmen) kommen in "externe" und werden über "nachrichten" angebunden.
-- Wenn etwas unklar ist oder fehlt, erfinde nichts. Schreibe eine kurze, konkrete Frage in "unklarheiten" (höchstens fünf, die wichtigsten zuerst).
+- Wenn etwas unklar ist oder fehlt, erfinde nichts. Schreibe eine kurze, konkrete Frage in "unklarheiten" (höchstens fünf, die wichtigsten zuerst). Jeder Eintrag ist eine Frage an die Person, die den Prozess kennt, keine Annahme und keine Begründung.
 - Details aus dem Text, die nicht als eigener Schritt ins Modell gehören, schreibst du kurz in "nicht_modelliert", damit nichts verloren geht.
 - Das Feld "beschreibung" lässt du leer.
-- Halte dich strikt an die Regeln unten, besonders: Aufgaben haben genau einen ein- und einen ausgehenden Sequenzfluss; Verzweigen und Zusammenführen nur über Gateways; Endereignisse haben genau einen eingehenden Fluss; jedes fachlich andere Ergebnis bekommt ein eigenes Endereignis.
+- Halte dich strikt an die Regeln unten, besonders: Aufgaben haben genau einen ein- und einen ausgehenden Sequenzfluss; Verzweigen und Zusammenführen nur über Gateways; Endereignisse haben genau einen eingehenden Fluss; jedes fachlich andere Ergebnis bekommt ein eigenes Endereignis; Endereignisse und alle anderen Ereignisse nennen einen eingetretenen Zustand ("Antrag ist abgelehnt"), Pfade nach einem XOR-Gateway nennen das Ergebnis ("vollständig", "unvollständig") statt "ja" oder "nein".
 
 ERLAUBTE WERTE
 - "typ" in elemente: start, zwischen, ende, aufgabe, teilprozess, xor, und, ereignisgateway

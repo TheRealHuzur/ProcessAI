@@ -640,12 +640,25 @@
       }
     };
 
-    sprache.onFinal = (satz) => {
+    // Merkt sich, wo der zuletzt eingesprochene Satz im Textfeld steht,
+    // damit eine verbesserte Fassung ihn ersetzen kann statt ihn zu wiederholen.
+    let letzterSatz = null;
+
+    sprache.onFinal = (satz, { ersetzt } = {}) => {
       if (!satz) return;
-      const vorher = el.quelltext.value;
-      const trenner = vorher && !/\s$/.test(vorher) ? " " : "";
       const text = satz.charAt(0).toUpperCase() + satz.slice(1);
-      el.quelltext.value = `${vorher}${trenner}${text}${/[.!?]$/.test(text) ? "" : "."}`;
+      const mitPunkt = `${text}${/[.!?]$/.test(text) ? "" : "."}`;
+      const aktuell = el.quelltext.value;
+      const unveraendert = letzterSatz && aktuell.length === letzterSatz.ende;
+      if (ersetzt && unveraendert) {
+        el.quelltext.value = aktuell.slice(0, letzterSatz.start) + mitPunkt;
+        letzterSatz = { start: letzterSatz.start, ende: el.quelltext.value.length };
+      } else {
+        const trenner = aktuell && !/\s$/.test(aktuell) ? " " : "";
+        const start = aktuell.length + trenner.length;
+        el.quelltext.value = `${aktuell}${trenner}${mitPunkt}`;
+        letzterSatz = { start, ende: el.quelltext.value.length };
+      }
       el.quelltext.scrollTop = el.quelltext.scrollHeight;
       aktualisiereZaehler();
       entwurfSichern();

@@ -9,10 +9,45 @@ import { erzeugeBpmnXml } from "./bpmn-xml.js";
 
 const MAX_KORREKTUREN = 1;
 
+const MERGE_ZIELE = new Set(["aufgabe", "teilprozess", "zwischen", "ende"]);
+
+// Regelwerk §8/§9: Mehrere Pfade dürfen nicht direkt in eine Aufgabe oder ein Ereignis laufen.
+// Das ist eine rein formale Korrektur ohne neuen Inhalt, deshalb macht die App sie selbst:
+// Davor wird ein exklusives Gateway (XOR) als Zusammenführung eingefügt.
+export function ergaenzeZusammenfuehrungen(modell) {
+  const hinweise = [];
+  const vergeben = new Set([...modell.elemente.map((e) => e.id), ...modell.fluesse.map((f) => f.id)]);
+  const neueId = (basis) => {
+    let id = basis;
+    let n = 2;
+    while (vergeben.has(id)) {
+      id = `${basis}_${n}`;
+      n += 1;
+    }
+    vergeben.add(id);
+    return id;
+  };
+
+  for (const ziel of [...modell.elemente]) {
+    if (!MERGE_ZIELE.has(ziel.typ)) continue;
+    const eingehend = modell.fluesse.filter((f) => f.nach === ziel.id);
+    if (eingehend.length < 2) continue;
+    const gatewayId = neueId(`Gateway_Join_${ziel.id}`.slice(0, 60));
+    const index = modell.elemente.indexOf(ziel);
+    modell.elemente.splice(index, 0, { id: gatewayId, typ: "xor", art: "", name: "", rolle: ziel.rolle, beschreibung: "" });
+    for (const fluss of eingehend) fluss.nach = gatewayId;
+    modell.fluesse.push({ id: neueId(`Flow_${gatewayId}`.slice(0, 60)), von: gatewayId, nach: ziel.id, name: "" });
+    hinweise.push({ regel: "§9", element: gatewayId, text: `Vor "${ziel.name || ziel.id}" liefen mehrere Pfade direkt zusammen. Die App hat dort ein exklusives Gateway als Zusammenführung ergänzt. Bitte prüfen, ob eine parallele Zusammenführung gemeint war.` });
+  }
+  return hinweise;
+}
+
 // Modell aus JSON bauen, ohne KI. Wird auch von Tests verwendet.
 export function bauenAusJson(roh) {
   const { modell, probleme } = normalisiereModell(roh);
+  const automatisch = ergaenzeZusammenfuehrungen(modell);
   const pruefung = pruefeModell(modell);
+  pruefung.hinweise = [...automatisch, ...pruefung.hinweise];
   return { modell, probleme, pruefung };
 }
 

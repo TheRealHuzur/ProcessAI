@@ -152,3 +152,45 @@ test("Umlaute und Leerzeichen in IDs werden bereinigt, Verweise bleiben gültig"
   assert.equal(modell.fluesse.length, 2);
   assert.equal(modell.elemente[0].rolle, modell.rollen[0].id);
 });
+
+test("Schleife zurück in eine Aufgabe bekommt automatisch ein XOR-Gateway", async () => {
+  const roh = {
+    rollen: [{ id: "Rolle_SB", name: "Sachbearbeitung" }],
+    elemente: [
+      { id: "Start_Eingang", typ: "start", art: "nachricht", name: "Antrag ist eingegangen", rolle: "Rolle_SB" },
+      { id: "Task_Pruefen", typ: "aufgabe", name: "Vollständigkeit prüfen", rolle: "Rolle_SB" },
+      { id: "Gateway_V", typ: "xor", rolle: "Rolle_SB" },
+      { id: "Task_Nachfordern", typ: "aufgabe", name: "Unterlagen nachfordern", rolle: "Rolle_SB" },
+      { id: "End_Ok", typ: "ende", name: "Antrag ist vollständig", rolle: "Rolle_SB" }
+    ],
+    fluesse: [
+      { von: "Start_Eingang", nach: "Task_Pruefen" },
+      { von: "Task_Pruefen", nach: "Gateway_V" },
+      { von: "Gateway_V", nach: "End_Ok", name: "vollständig" },
+      { von: "Gateway_V", nach: "Task_Nachfordern", name: "unvollständig" },
+      { von: "Task_Nachfordern", nach: "Task_Pruefen" }
+    ]
+  };
+  const { modell, pruefung } = bauenAusJson(roh);
+  assert.deepEqual(pruefung.fehler, []);
+  const join = modell.elemente.find((e) => e.id === "Gateway_Join_Task_Pruefen");
+  assert.ok(join && join.typ === "xor");
+  assert.ok(pruefung.hinweise.some((h) => h.element === join.id));
+  const { warnings } = await parseXml(zuXml(modell));
+  assert.deepEqual(warnings, []);
+});
+
+test("Hinweis bei ja/nein-Beschriftung am XOR", () => {
+  const roh = {
+    elemente: [
+      { id: "S", typ: "start", name: "Meldung ist eingegangen" },
+      { id: "A", typ: "aufgabe", name: "Menge prüfen" },
+      { id: "G", typ: "xor" },
+      { id: "E1", typ: "ende", name: "Menge ist eingehalten" },
+      { id: "E2", typ: "ende", name: "Menge ist überschritten" }
+    ],
+    fluesse: [{ von: "S", nach: "A" }, { von: "A", nach: "G" }, { von: "G", nach: "E1", name: "nein" }, { von: "G", nach: "E2", name: "ja" }]
+  };
+  const { pruefung } = bauenAusJson(roh);
+  assert.ok(pruefung.hinweise.some((h) => h.regel === "§10" && h.text.includes("ja/nein")));
+});

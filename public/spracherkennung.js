@@ -18,6 +18,33 @@
     if (!Recognition) return erkennung;
 
     let instanz = null;
+    let letzterFinal = "";
+
+    function normal(text) {
+      return String(text || "").toLowerCase().replace(/[^\p{L}\p{N} ]/gu, "").replace(/\s+/g, " ").trim();
+    }
+
+    // Chrome auf Android liefert denselben Satz oft mehrfach als "final",
+    // jeweils etwas länger ("Also", "Also der", "Also der Prozess").
+    // Solche Wiederholungen ersetzen den letzten Satz statt ihn anzuhängen.
+    function istFortsetzung(alt, neu) {
+      const a = normal(alt);
+      const b = normal(neu);
+      if (!a || !b) return false;
+      if (a === b || b.startsWith(a) || a.startsWith(b)) return true;
+      let gemeinsam = 0;
+      while (gemeinsam < a.length && gemeinsam < b.length && a[gemeinsam] === b[gemeinsam]) gemeinsam += 1;
+      return gemeinsam >= 6 && gemeinsam >= Math.min(a.length, b.length) * 0.6;
+    }
+
+    function meldeFinal(text) {
+      const satz = String(text || "").trim();
+      if (!satz) return;
+      if (normal(satz) === normal(letzterFinal)) return;
+      const ersetzt = istFortsetzung(letzterFinal, satz);
+      letzterFinal = satz;
+      erkennung.onFinal(satz, { ersetzt });
+    }
 
     function neueInstanz() {
       const r = new Recognition();
@@ -30,7 +57,7 @@
         for (let i = event.resultIndex; i < event.results.length; i += 1) {
           const ergebnis = event.results[i];
           if (ergebnis.isFinal) {
-            erkennung.onFinal(ergebnis[0].transcript.trim());
+            meldeFinal(ergebnis[0].transcript);
           } else {
             zwischen += ergebnis[0].transcript;
           }
@@ -71,6 +98,7 @@
 
     function start() {
       if (erkennung.aktiv) return;
+      letzterFinal = "";
       instanz = neueInstanz();
       erkennung.aktiv = true;
       try {

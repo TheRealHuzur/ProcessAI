@@ -100,8 +100,11 @@ export function pruefeModell(modell) {
       }
       if (element.typ === "xor" && istSplit) {
         const unbeschriftet = aus.get(element.id).filter((fl) => !fl.name);
+        const jaNein = aus.get(element.id).filter((fl) => /^(ja|nein|yes|no)$/i.test((fl.name || "").trim()));
         if (unbeschriftet.length > 0) {
           h("§10", element, `Die ausgehenden Pfade am Gateway ${label(element)} sollten mit dem Ergebnis beschriftet sein (z. B. "vollständig" und "unvollständig").`);
+        } else if (jaNein.length > 0) {
+          h("§10", element, `Die Pfade am Gateway ${label(element)} sind mit "ja/nein" beschriftet. Besser das Ergebnis nennen, z. B. "überschritten" und "nicht überschritten".`);
         }
       }
     }
