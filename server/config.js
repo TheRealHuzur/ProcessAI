@@ -27,7 +27,9 @@ export const PROVIDERS = {
 // Modelle für das Auswahlfeld. Überschreibbar per MODELS_JSON (gleiche Struktur).
 const DEFAULT_MODELS = [
   { id: "deepseek/deepseek-v4-flash", label: "DeepSeek V4 Flash (sehr günstig)", provider: "openrouter" },
-  { id: "mistralai/mistral-small-2603", label: "Mistral Small 4", provider: "openrouter" }
+  { id: "mistralai/mistral-small-2603", label: "Mistral Small 4", provider: "openrouter" },
+  // Direkt bei Mistral (EU). Erscheint nur, wenn MISTRAL_API_KEY gesetzt ist.
+  { id: "mistral/mistral-small-latest", apiModel: "mistral-small-latest", label: "Mistral Small (direkt bei Mistral, EU)", provider: "mistral" }
 ];
 
 function readModels() {
@@ -57,6 +59,14 @@ export const config = {
   maxTextLength: 30000
 };
 
+// Nur Modelle, für deren Anbieter ein API-Schlüssel hinterlegt ist
+export function verfuegbareModelle() {
+  return config.models.filter((model) => {
+    const provider = PROVIDERS[model.provider];
+    return provider && Boolean(process.env[provider.apiKeyEnv]);
+  });
+}
+
 export function findModel(modelId) {
-  return config.models.find((model) => model.id === modelId) || null;
+  return verfuegbareModelle().find((model) => model.id === modelId) || null;
 }

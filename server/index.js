@@ -1,7 +1,7 @@
 // ProzessPilot: Webserver und Schnittstelle
 import path from "node:path";
 import express from "express";
-import { config, findModel, ROOT_DIR } from "./config.js";
+import { config, findModel, verfuegbareModelle, ROOT_DIR } from "./config.js";
 import { oeffneDatenbank } from "./db.js";
 import { anmelden, abmelden, istAngemeldet, nurAngemeldet } from "./auth.js";
 import { erzeugeModell } from "./pipeline.js";
@@ -31,13 +31,14 @@ export function erstelleApp({ db, llm } = {}) {
   app.use("/api", nurAngemeldet);
 
   app.get("/api/modelle", (req, res) => {
-    res.json(config.models.map(({ id, label }) => ({ id, label })));
+    const modelle = verfuegbareModelle();
+    res.json((modelle.length ? modelle : config.models).map(({ id, label }) => ({ id, label })));
   });
 
   app.post("/api/erzeugen", async (req, res) => {
     const text = String(req.body?.text || "").trim();
     const prozessname = String(req.body?.prozessname || "").trim();
-    const model = findModel(String(req.body?.modell || "")) || config.models[0];
+    const model = findModel(String(req.body?.modell || "")) || verfuegbareModelle()[0] || config.models[0];
 
     if (text.length < 20) {
       return res.status(400).json({ fehler: "Die Prozessbeschreibung ist zu kurz." });

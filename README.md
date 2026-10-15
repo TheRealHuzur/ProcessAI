@@ -24,7 +24,7 @@ Erster Entwurf (Version 0.1):
 | `APP_PASSWORD` | ja | Passwort für die Anmeldung |
 | `OPENROUTER_API_KEY` | ja | Schlüssel für OpenRouter |
 | `SESSION_SECRET` | empfohlen | beliebige lange Zeichenfolge; sonst nach jedem Neustart neu anmelden |
-| `MISTRAL_API_KEY` | nein | erst nötig, wenn Mistral direkt angebunden wird |
+| `MISTRAL_API_KEY` | nein | schaltet zusätzlich "Mistral Small (direkt bei Mistral, EU)" frei, ohne Umweg über OpenRouter |
 | `MODELS_JSON` | nein | eigene Modellliste, siehe `server/config.js` |
 
 4. Persistenter Speicher: Volume auf **`/data`** einhängen. Dort liegt die Datenbank `prozesspilot.db`.
