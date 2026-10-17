@@ -81,6 +81,39 @@ REGELWERK
 ${ladeRegelwerk()}`;
 }
 
+// Änderungsmodus: bestehendes Modell plus Anweisung (Sprachbefehl im Editor oder Antwort auf eine Frage der KI)
+export function aenderungsPrompt() {
+  return `${systemPrompt()}
+
+ÄNDERUNGSMODUS
+Statt einer Prozessbeschreibung bekommst du ein bestehendes Modell als JSON und eine Änderungsanweisung, oft per Spracherkennung erfasst.
+- Setze genau die Anweisung um. Alles andere bleibt unverändert: gleiche ids, gleiche Namen, gleiche Rollen, gleiche Flüsse, gleiche Reihenfolge.
+- Neue Elemente und Flüsse bekommen neue, sprechende ids, die im Modell noch nicht vorkommen.
+- Entfernst du ein Element, entferne auch seine Flüsse und verbinde Vorgänger und Nachfolger so, dass der Ablauf gültig bleibt.
+- Auch nach der Änderung gelten alle Regeln; das Modell muss regelkonform bleiben.
+- Das Feld "beschreibung" ist im Eingabemodell weggelassen. Lass es weg; die App übernimmt die Beschreibungen selbst.
+- "unklarheiten": offene Fragen behalten, beantwortete streichen, neue nur bei echter Unklarheit.
+- Ergänze das Feld "aenderungen": eine Liste kurzer Sätze, was du geändert hast (z. B. "Aufgabe „Rechnung buchen“ nach „Antrag prüfen“ eingefügt").
+- Ist die Anweisung unklar oder nicht umsetzbar, ändere nichts, gib das Modell unverändert zurück und schreibe eine kurze Rückfrage in das Feld "rueckfrage".
+- Antworte ausschließlich mit dem vollständigen JSON-Objekt.`;
+}
+
+export function aenderungsNachricht({ modell, anweisung, bezug = {} }) {
+  const teile = [`Bestehendes Prozessmodell:
+${JSON.stringify(modell)}`];
+  if (bezug.frage) {
+    teile.push(`Die Anweisung ist die Antwort auf deine Frage: "${bezug.frage}"
+Arbeite die Antwort ins Modell ein und streiche die Frage aus "unklarheiten".`);
+  } else if (bezug.elementId) {
+    teile.push(`Ausgewählt ist das Element "${bezug.elementName || bezug.elementId}" (id ${bezug.elementId}). Wörter wie "das", "hier" oder "dieser Schritt" meinen dieses Element.`);
+  }
+  teile.push(`Änderungsanweisung:
+"""
+${anweisung}
+"""`);
+  return teile.join("\n\n");
+}
+
 export function nutzerNachricht({ prozessname, text }) {
   return `Name des Prozesses: ${prozessname || "(nicht angegeben, bitte passend benennen)"}
 

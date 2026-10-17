@@ -37,7 +37,16 @@
     loginPasswort: $("login-passwort"),
     loginFehler: $("login-fehler"),
     fileInput: $("file-input"),
-    toasts: $("toast-container")
+    toasts: $("toast-container"),
+    befehl: $("befehl"),
+    befehlAusfuehren: $("btn-befehl"),
+    befehlMikro: $("btn-befehl-mikro"),
+    befehlFortschritt: $("befehl-fortschritt"),
+    befehlBezug: $("befehl-bezug"),
+    befehlBezugText: $("befehl-bezug-text"),
+    rueckgaengig: $("btn-rueckgaengig"),
+    blockAenderungen: $("block-aenderungen"),
+    listeAenderungen: $("liste-aenderungen")
   };
 
   const LEER_XML = `<?xml version="1.0" encoding="UTF-8"?>
@@ -78,8 +87,21 @@
     dirty: false,
     markierungen: [],
     ausgewaehlt: null,
-    wechselt: false
+    wechselt: false,
+    kiLaeuft: false,
+    // Offene Fragen der KI zum aktuellen Modell; gehen bei jeder Änderung wieder an die KI
+    fragen: { unklarheiten: [], nichtModelliert: [] },
+    letztesErgebnis: null,
+    // Stände vor KI-Änderungen für "Rückgängig"
+    verlauf: [],
+    // Anweisungen seit dem letzten Speichern, landen in der Notiz der Version
+    befehle: [],
+    bezugFrage: null,
+    sprachZiel: "quelltext",
+    befehlNachStopp: false
   };
+
+  const MAX_VERLAUF = 10;
 
   // ---------- Hilfen ----------
 
@@ -165,6 +187,62 @@
   function setDirty(wert) {
     state.dirty = wert;
     el.editorStatus.textContent = wert ? "Ungespeicherte Änderungen" : (state.prozessId ? "Gespeichert" : "");
+    if (wert) modellEntwurfPlanen();
+    else modellEntwurfVerwerfen();
+  }
+
+  // Ungespeichertes Modell laufend im Browser sichern, damit nach Absturz oder Neuladen nichts verloren geht
+  let modellSicherung = null;
+
+  function modellEntwurfPlanen() {
+    clearTimeout(modellSicherung);
+    modellSicherung = setTimeout(async () => {
+      if (!state.dirty || !el.leerHinweis.hidden || !state.modeler) return;
+      try {
+        speicherSchreiben("pp.modellEntwurf", JSON.stringify({ xml: await aktuellesXml(), prozessId: state.prozessId, zeit: new Date().toISOString() }));
+      } catch {
+        /* nächster Versuch bei der nächsten Änderung */
+      }
+    }, 1500);
+  }
+
+  function modellEntwurfVerwerfen() {
+    clearTimeout(modellSicherung);
+    try {
+      window.localStorage.removeItem("pp.modellEntwurf");
+    } catch {
+      /* Browser-Speicher nicht verfügbar */
+    }
+  }
+
+  function modellEntwurfLesen() {
+    try {
+      const entwurf = JSON.parse(speicherLesen("pp.modellEntwurf") || "null");
+      return entwurf && entwurf.xml ? entwurf : null;
+    } catch {
+      return null;
+    }
+  }
+
+  // Zeitbasierte Fortschrittsanzeige für KI-Aufrufe; gibt eine Funktion zum Beenden zurück
+  function starteFortschritt(feld, meldungen) {
+    const beginn = Date.now();
+    feld.hidden = false;
+    feld.textContent = meldungen[0];
+    const timer = setInterval(() => {
+      const s = Math.round((Date.now() - beginn) / 1000);
+      feld.textContent = `${meldungen[Math.min(Math.floor(s / 12), meldungen.length - 1)]} (${s} s)`;
+    }, 500);
+    return () => {
+      clearInterval(timer);
+      feld.hidden = true;
+    };
+  }
+
+  function kiSperren(an) {
+    state.kiLaeuft = an;
+    el.erzeugen.disabled = an;
+    el.befehlAusfuehren.disabled = an;
   }
 
   // ---------- Editor ----------
@@ -260,7 +338,7 @@
     el.leerHinweis.hidden = true;
   }
 
-  function setzeMarkierungen(fehler, hinweise) {
+  function setzeMarkierungen(fehler, hinweise, aenderung) {
     const canvas = state.modeler.get("canvas");
     const registry = state.modeler.get("elementRegistry");
     for (const { id, klasse } of state.markierungen) {
@@ -275,6 +353,10 @@
         }
       }
     };
+    if (aenderung) {
+      setze(aenderung.neu.map((id) => ({ element: id })), "pp-neu");
+      setze(aenderung.geaendert.map((id) => ({ element: id })), "pp-geaendert");
+    }
     setze(hinweise, "pp-hinweis");
     setze(fehler, "pp-fehler");
   }
@@ -303,11 +385,13 @@
     if (!istBearbeitbar(element)) {
       state.ausgewaehlt = null;
       el.panelElement.hidden = true;
+      aktualisiereBezug();
       return;
     }
     state.ausgewaehlt = element;
     fuellePanel(element, {});
     el.panelElement.hidden = false;
+    aktualisiereBezug();
   }
 
   function fuellePanel(element, { nurWennNichtFokussiert }) {
@@ -362,11 +446,37 @@
     return li;
   }
 
+  function zeigeAenderungen(aenderung) {
+    if (!aenderung) {
+      el.blockAenderungen.hidden = true;
+      return;
+    }
+    const eintraege = aenderung.texte.map((t) => befundElement(t, "aenderung"));
+    if (eintraege.length === 0) {
+      eintraege.push(befundElement(`${aenderung.neu.length} neu, ${aenderung.geaendert.length} geändert (im Modell markiert).`, "aenderung"));
+    }
+    for (const e of aenderung.entfernt) {
+      if (!e.name && (e.art === "Sequenzfluss" || e.art === "Nachrichtenfluss")) continue;
+      eintraege.push(befundElement(`Entfernt: ${e.art} „${e.name || e.id}“`, "entfernt"));
+    }
+    eintraege.push(befundElement("Grün ist neu, lila ist geändert.", "frage"));
+    el.listeAenderungen.replaceChildren(...eintraege);
+    el.blockAenderungen.hidden = false;
+  }
+
   function zeigeErgebnis(ergebnis) {
     const { pruefung, unklarheiten, nichtModelliert, korrigiert, modell, dauerMs } = ergebnis;
+    state.letztesErgebnis = ergebnis;
+    zeigeAenderungen(ergebnis.aenderung);
     el.listeFehler.replaceChildren(...pruefung.fehler.map((f) => befundElement(f.text, "fehler", f)));
     el.listeHinweise.replaceChildren(...pruefung.hinweise.map((h) => befundElement(h.text, "hinweis", h)));
-    el.listeUnklar.replaceChildren(...unklarheiten.map((u) => befundElement(u, "frage")));
+    el.listeUnklar.replaceChildren(...unklarheiten.map((u) => {
+      const li = befundElement(u, "frage");
+      li.dataset.antworten = "";
+      li.title = "Antworten: per Sprache oder Text in der Zeile über dem Modell";
+      li.addEventListener("click", () => setzeBezugFrage(u));
+      return li;
+    }));
     el.listeNicht.replaceChildren(...nichtModelliert.map((n) => befundElement(n, "frage")));
     el.blockUnklar.hidden = unklarheiten.length === 0;
     el.blockNicht.hidden = nichtModelliert.length === 0;
@@ -395,26 +505,21 @@
       el.quelltext.focus();
       return;
     }
+    if (state.kiLaeuft) return;
     if (window.PPSprache.aktiv) window.PPSprache.stop();
     if (state.dirty && el.leerHinweis.hidden && !window.confirm("Das aktuelle Modell wird durch den neuen Entwurf ersetzt. Weiter?")) {
       return;
     }
 
-    el.erzeugen.disabled = true;
-    el.fortschritt.hidden = false;
-    const beginn = Date.now();
-    const meldungen = ["Die KI liest die Beschreibung …", "Die KI entwirft das Modell …", "Regelcheck läuft …", "Fast fertig …"];
-    const timer = setInterval(() => {
-      const s = Math.round((Date.now() - beginn) / 1000);
-      el.fortschritt.textContent = `${meldungen[Math.min(Math.floor(s / 12), meldungen.length - 1)]} (${s} s)`;
-    }, 500);
-    el.fortschritt.textContent = meldungen[0];
+    kiSperren(true);
+    const fortschrittEnde = starteFortschritt(el.fortschritt, ["Die KI liest die Beschreibung …", "Die KI entwirft das Modell …", "Regelcheck läuft …", "Fast fertig …"]);
 
     try {
       const ergebnis = await api("/api/erzeugen", {
         method: "POST",
         body: { text, prozessname: el.prozessname.value.trim(), modell: el.modell.value }
       });
+      await merkeStand();
       await importiere(ergebnis.xml);
       verbergeLeerHinweis();
       if (!el.prozessname.value.trim() && ergebnis.prozessname) {
@@ -423,15 +528,173 @@
       }
       setzeMarkierungen(ergebnis.pruefung.fehler, ergebnis.pruefung.hinweise);
       zeigeErgebnis(ergebnis);
+      state.fragen = { unklarheiten: ergebnis.unklarheiten, nichtModelliert: ergebnis.nichtModelliert };
       state.letzteErzeugung = { kiModell: ergebnis.modell, kiJson: ergebnis.modellJson, pruefung: ergebnis.pruefung };
+      state.befehle = [];
       setDirty(true);
       toast("Modell erzeugt. Bitte prüfen.", "ok");
     } catch (error) {
       toast(error.message, "error");
     } finally {
-      clearInterval(timer);
-      el.erzeugen.disabled = false;
-      el.fortschritt.hidden = true;
+      fortschrittEnde();
+      kiSperren(false);
+    }
+  }
+
+  // ---------- Ändern per Sprachbefehl oder Text ----------
+
+  function aktualisiereBezug() {
+    let text = "";
+    if (state.bezugFrage) {
+      text = `Antwort auf: ${state.bezugFrage}`;
+    } else if (state.ausgewaehlt) {
+      const bo = state.ausgewaehlt.businessObject;
+      text = `Bezieht sich auf: ${bo.name || TYP_NAMEN[bo.$type] || bo.id}`;
+    }
+    el.befehlBezugText.textContent = text;
+    el.befehlBezug.title = text;
+    el.befehlBezug.hidden = !text;
+  }
+
+  function setzeBezugFrage(frage) {
+    state.bezugFrage = frage;
+    aktualisiereBezug();
+    el.befehl.focus();
+  }
+
+  function bezugEntfernen() {
+    if (state.bezugFrage) {
+      state.bezugFrage = null;
+      aktualisiereBezug();
+    } else {
+      state.modeler.get("selection").select([]);
+    }
+  }
+
+  function bezugFuerKi() {
+    if (state.bezugFrage) return { frage: state.bezugFrage };
+    if (state.ausgewaehlt) {
+      const bo = state.ausgewaehlt.businessObject;
+      return { elementId: bo.id, elementName: bo.name || TYP_NAMEN[bo.$type] || "" };
+    }
+    return {};
+  }
+
+  async function merkeStand() {
+    if (!el.leerHinweis.hidden) return;
+    state.verlauf.push({
+      xml: await aktuellesXml(),
+      ergebnis: state.letztesErgebnis,
+      fragen: state.fragen,
+      letzteErzeugung: state.letzteErzeugung,
+      befehle: [...state.befehle]
+    });
+    if (state.verlauf.length > MAX_VERLAUF) state.verlauf.shift();
+    el.rueckgaengig.hidden = false;
+  }
+
+  function verlaufLeeren() {
+    state.verlauf = [];
+    state.befehle = [];
+    state.bezugFrage = null;
+    state.fragen = { unklarheiten: [], nichtModelliert: [] };
+    state.letztesErgebnis = null;
+    el.rueckgaengig.hidden = true;
+    aktualisiereBezug();
+  }
+
+  async function rueckgaengig() {
+    const stand = state.verlauf.pop();
+    if (!stand || state.kiLaeuft) return;
+    try {
+      await importiere(stand.xml);
+      verbergeLeerHinweis();
+      state.fragen = stand.fragen;
+      state.letzteErzeugung = stand.letzteErzeugung;
+      state.befehle = stand.befehle;
+      if (stand.ergebnis) {
+        zeigeErgebnis(stand.ergebnis);
+        setzeMarkierungen(stand.ergebnis.pruefung.fehler, stand.ergebnis.pruefung.hinweise);
+      } else {
+        state.letztesErgebnis = null;
+        el.ergebnis.hidden = true;
+      }
+      setDirty(true);
+      toast("Stand vor der letzten KI-Änderung wiederhergestellt.");
+    } catch (error) {
+      console.error(error);
+      toast("Rückgängig hat nicht geklappt.", "error");
+    } finally {
+      el.rueckgaengig.hidden = state.verlauf.length === 0;
+    }
+  }
+
+  async function befehlAusfuehren() {
+    if (state.kiLaeuft) return;
+    const sprache = window.PPSprache;
+    if (sprache.aktiv && state.sprachZiel === "befehl") {
+      // Erst die Aufnahme sauber beenden, danach geht es von selbst weiter
+      state.befehlNachStopp = true;
+      sprache.stop();
+      return;
+    }
+    const anweisung = el.befehl.value.trim();
+    if (anweisung.length < 3) {
+      toast("Bitte sag oder schreib, was sich ändern soll.", "error");
+      el.befehl.focus();
+      return;
+    }
+    if (!el.leerHinweis.hidden) {
+      toast("Es gibt noch kein Modell. Erst den Prozess einsprechen und das Modell erzeugen.", "error");
+      return;
+    }
+    const { modell, abweichungen } = window.PPModellLesen.lesen(state.modeler.getDefinitions());
+    if (!modell || modell.elemente.length === 0) {
+      toast("Es gibt noch kein Modell, das geändert werden kann.", "error");
+      return;
+    }
+    if (abweichungen.length && !window.confirm(`Beim Ändern durch die KI gilt:\n\n- ${abweichungen.join("\n- ")}\n\nTrotzdem ändern?`)) {
+      return;
+    }
+    modell.unklarheiten = state.fragen.unklarheiten;
+    modell.nicht_modelliert = state.fragen.nichtModelliert;
+
+    kiSperren(true);
+    const fortschrittEnde = starteFortschritt(el.befehlFortschritt, ["Die KI liest die Änderung …", "Die KI ändert das Modell …", "Regelcheck läuft …", "Fast fertig …"]);
+    let rueckfrage = "";
+    try {
+      const ergebnis = await api("/api/aendern", {
+        method: "POST",
+        body: { prozess: modell, anweisung, bezug: bezugFuerKi(), modell: el.modell.value }
+      });
+      if (ergebnis.aenderung.unveraendert) {
+        rueckfrage = ergebnis.aenderung.rueckfrage
+          ? `Rückfrage der KI: ${ergebnis.aenderung.rueckfrage}`
+          : "Die KI hat nichts geändert. Bitte die Anweisung genauer fassen.";
+        return;
+      }
+      await merkeStand();
+      await importiere(ergebnis.xml);
+      verbergeLeerHinweis();
+      state.fragen = { unklarheiten: ergebnis.unklarheiten, nichtModelliert: ergebnis.nichtModelliert };
+      state.letzteErzeugung = { kiModell: ergebnis.modell, kiJson: ergebnis.modellJson, pruefung: ergebnis.pruefung };
+      state.befehle.push(anweisung);
+      state.bezugFrage = null;
+      aktualisiereBezug();
+      setzeMarkierungen(ergebnis.pruefung.fehler, ergebnis.pruefung.hinweise, ergebnis.aenderung);
+      zeigeErgebnis(ergebnis);
+      el.befehl.value = "";
+      setDirty(true);
+      toast(ergebnis.aenderung.rueckfrage ? `Geändert. Rückfrage der KI: ${ergebnis.aenderung.rueckfrage}` : "Modell geändert. Grün ist neu, lila ist geändert.", "ok");
+    } catch (error) {
+      toast(error.message, "error");
+    } finally {
+      fortschrittEnde();
+      kiSperren(false);
+      if (rueckfrage) {
+        el.befehlFortschritt.textContent = rueckfrage;
+        el.befehlFortschritt.hidden = false;
+      }
     }
   }
 
@@ -443,11 +706,13 @@
         name: el.prozessname.value.trim() || "Neuer Prozess",
         bpmnXml,
         quelltext: el.quelltext.value,
+        notiz: state.befehle.length ? `Geändert per Anweisung: ${state.befehle.join(" | ")}` : "",
         ...(state.letzteErzeugung || {})
       };
       const ergebnis = await api("/api/prozesse", { method: "POST", body });
       state.prozessId = ergebnis.id;
       state.letzteErzeugung = null;
+      state.befehle = [];
       speicherSchreiben("pp.prozessId", ergebnis.id);
       setDirty(false);
       toast(`Gespeichert als Version ${ergebnis.version}.`, "ok");
@@ -462,6 +727,8 @@
       if (!prozess.aktuell) throw new Error("Keine Version vorhanden.");
       await importiere(prozess.aktuell.bpmn_xml);
       verbergeLeerHinweis();
+      verlaufLeeren();
+      state.fragen = fragenAusKiJson(prozess.aktuell.ki_json);
       state.prozessId = prozess.id;
       state.letzteErzeugung = null;
       if (!felderBehalten) {
@@ -476,6 +743,17 @@
       toast(`"${prozess.name}" geladen (Version ${prozess.aktuell.version}).`);
     } catch (error) {
       if (error.status !== 401) toast(`Laden fehlgeschlagen: ${error.message}`, "error");
+    }
+  }
+
+  // Offene Fragen der KI aus der gespeicherten Version, damit sie bei Änderungen erhalten bleiben
+  function fragenAusKiJson(kiJson) {
+    try {
+      const roh = JSON.parse(kiJson || "null");
+      const liste = (x) => (Array.isArray(x) ? x.map(String).filter(Boolean) : []);
+      return { unklarheiten: liste(roh && roh.unklarheiten), nichtModelliert: liste(roh && (roh.nicht_modelliert || roh.nichtModelliert)) };
+    } catch {
+      return { unklarheiten: [], nichtModelliert: [] };
     }
   }
 
@@ -537,6 +815,7 @@
   async function neu() {
     if (state.dirty && !window.confirm("Ungespeicherte Änderungen gehen verloren. Neu beginnen?")) return;
     await importiere(LEER_XML);
+    verlaufLeeren();
     state.prozessId = null;
     state.letzteErzeugung = null;
     el.prozessname.value = "";
@@ -562,6 +841,7 @@
       try {
         await importiere(String(reader.result || ""));
         verbergeLeerHinweis();
+        verlaufLeeren();
         state.prozessId = null;
         state.letzteErzeugung = null;
         const definitions = state.modeler.getDefinitions();
@@ -622,62 +902,101 @@
 
   // ---------- Spracherkennung ----------
 
+  // Eine Spracherkennung, zwei Ziele: die Prozessbeschreibung links oder die Befehlszeile über dem Modell
   function richteSpracheEin() {
     const sprache = window.PPSprache;
     if (!sprache.istVerfuegbar) {
       el.mikro.disabled = true;
+      el.befehlMikro.disabled = true;
+      el.befehlMikro.title = "Spracherkennung wird von diesem Browser nicht unterstützt.";
       el.mikroStatus.textContent = "Spracherkennung wird von diesem Browser nicht unterstützt. Bitte Chrome verwenden oder den Text eintippen.";
       return;
     }
 
+    const MIKRO_HINWEIS = "Erzähl den Prozess einfach so, wie du ihn jemandem erklären würdest.";
+    const zielFeld = () => (state.sprachZiel === "befehl" ? el.befehl : el.quelltext);
+
     const anzeigen = (aktiv) => {
-      el.mikro.classList.toggle("is-aktiv", aktiv);
-      el.mikro.setAttribute("aria-pressed", String(aktiv));
-      el.mikroText.textContent = aktiv ? "Aufnahme beenden" : "Einsprechen";
+      const befehl = state.sprachZiel === "befehl";
+      el.mikro.classList.toggle("is-aktiv", aktiv && !befehl);
+      el.mikro.setAttribute("aria-pressed", String(aktiv && !befehl));
+      el.mikroText.textContent = aktiv && !befehl ? "Aufnahme beenden" : "Einsprechen";
+      el.befehlMikro.classList.toggle("is-aktiv", aktiv && befehl);
+      el.befehlMikro.setAttribute("aria-pressed", String(aktiv && befehl));
+      el.mikro.disabled = aktiv && befehl;
+      el.befehlMikro.disabled = aktiv && !befehl;
       if (!aktiv) {
         el.mikroStatus.classList.remove("zwischen");
-        el.mikroStatus.textContent = "Erzähl den Prozess einfach so, wie du ihn jemandem erklären würdest.";
+        el.mikroStatus.textContent = MIKRO_HINWEIS;
       }
     };
 
-    // Merkt sich, wo der zuletzt eingesprochene Satz im Textfeld steht,
+    // Merkt sich, wo der zuletzt eingesprochene Satz im Zielfeld steht,
     // damit eine verbesserte Fassung ihn ersetzen kann statt ihn zu wiederholen.
     let letzterSatz = null;
 
     sprache.onFinal = (satz, { ersetzt } = {}) => {
       if (!satz) return;
+      const feld = zielFeld();
       const text = satz.charAt(0).toUpperCase() + satz.slice(1);
       const mitPunkt = `${text}${/[.!?]$/.test(text) ? "" : "."}`;
-      const aktuell = el.quelltext.value;
+      const aktuell = feld.value;
       const unveraendert = letzterSatz && aktuell.length === letzterSatz.ende;
       if (ersetzt && unveraendert) {
-        el.quelltext.value = aktuell.slice(0, letzterSatz.start) + mitPunkt;
-        letzterSatz = { start: letzterSatz.start, ende: el.quelltext.value.length };
+        feld.value = aktuell.slice(0, letzterSatz.start) + mitPunkt;
+        letzterSatz = { start: letzterSatz.start, ende: feld.value.length };
       } else {
         const trenner = aktuell && !/\s$/.test(aktuell) ? " " : "";
         const start = aktuell.length + trenner.length;
-        el.quelltext.value = `${aktuell}${trenner}${mitPunkt}`;
-        letzterSatz = { start, ende: el.quelltext.value.length };
+        feld.value = `${aktuell}${trenner}${mitPunkt}`;
+        letzterSatz = { start, ende: feld.value.length };
       }
-      el.quelltext.scrollTop = el.quelltext.scrollHeight;
-      aktualisiereZaehler();
-      entwurfSichern();
+      if (feld === el.quelltext) {
+        el.quelltext.scrollTop = el.quelltext.scrollHeight;
+        aktualisiereZaehler();
+        entwurfSichern();
+      }
     };
     sprache.onZwischen = (zwischen) => {
       if (!sprache.aktiv) return;
+      if (state.sprachZiel === "befehl") {
+        el.befehlFortschritt.hidden = false;
+        el.befehlFortschritt.textContent = zwischen ? `„${zwischen}“` : "Ich höre zu … Zum Ausführen das Mikrofon erneut drücken.";
+        return;
+      }
       el.mikroStatus.classList.toggle("zwischen", Boolean(zwischen));
       el.mikroStatus.textContent = zwischen || "Ich höre zu …";
     };
     sprache.onStatus = (status) => {
       if (status.gestartet) {
         anzeigen(true);
-        el.mikroStatus.textContent = "Ich höre zu …";
+        if (state.sprachZiel === "befehl") {
+          el.befehlFortschritt.hidden = false;
+          el.befehlFortschritt.textContent = "Ich höre zu … Zum Ausführen das Mikrofon erneut drücken.";
+        } else {
+          el.mikroStatus.textContent = "Ich höre zu …";
+        }
       }
       if (status.fehler) {
         toast(status.fehler, "error");
         if (!sprache.aktiv) anzeigen(false);
       }
-      if (status.beendet) anzeigen(false);
+      if (status.beendet) {
+        anzeigen(false);
+        if (state.sprachZiel === "befehl" && !state.kiLaeuft) el.befehlFortschritt.hidden = true;
+        // Befehl erst ausführen, wenn die Erkennung den letzten Satz geliefert hat
+        if (state.befehlNachStopp) {
+          state.befehlNachStopp = false;
+          if (el.befehl.value.trim()) befehlAusfuehren();
+        }
+      }
+    };
+
+    const starte = (ziel) => {
+      state.sprachZiel = ziel;
+      state.befehlNachStopp = false;
+      letzterSatz = null;
+      sprache.start();
     };
 
     el.mikro.addEventListener("click", () => {
@@ -685,7 +1004,16 @@
         sprache.stop();
         anzeigen(false);
       } else {
-        sprache.start();
+        starte("quelltext");
+      }
+    });
+
+    el.befehlMikro.addEventListener("click", () => {
+      if (sprache.aktiv) {
+        state.befehlNachStopp = state.sprachZiel === "befehl";
+        sprache.stop();
+      } else if (!state.kiLaeuft) {
+        starte("befehl");
       }
     });
   }
@@ -729,11 +1057,26 @@
   // ---------- Start ----------
 
   async function start() {
+    // Vor dem ersten Import lesen, der Import selbst setzt den Änderungsstatus zurück
+    const modellEntwurf = modellEntwurfLesen();
     baueModeButtons();
     await erstelleModeler(state.mode, LEER_XML);
     setDirty(false);
     entwurfLaden();
     richteSpracheEin();
+    if (modellEntwurf) {
+      try {
+        await importiere(modellEntwurf.xml);
+        verbergeLeerHinweis();
+        state.prozessId = modellEntwurf.prozessId || null;
+        setDirty(true);
+        toast("Ungespeichertes Modell aus der letzten Sitzung wiederhergestellt.", "ok");
+      } catch (error) {
+        console.error(error);
+        await importiere(LEER_XML);
+        setDirty(false);
+      }
+    }
 
     $("btn-erzeugen").addEventListener("click", modellErzeugen);
     $("btn-speichern").addEventListener("click", speichern);
@@ -744,6 +1087,15 @@
     $("btn-svg").addEventListener("click", exportSvg);
     $("btn-selbst-zeichnen").addEventListener("click", verbergeLeerHinweis);
     $("btn-element-schliessen").addEventListener("click", () => state.modeler.get("selection").select([]));
+    el.befehlAusfuehren.addEventListener("click", befehlAusfuehren);
+    el.befehl.addEventListener("keydown", (event) => {
+      if (event.key === "Enter") {
+        event.preventDefault();
+        befehlAusfuehren();
+      }
+    });
+    el.rueckgaengig.addEventListener("click", rueckgaengig);
+    $("btn-bezug-weg").addEventListener("click", bezugEntfernen);
     $("btn-abmelden").addEventListener("click", async () => {
       await api("/api/abmelden", { method: "POST" }).catch(() => {});
       zeigeLogin();
@@ -784,7 +1136,7 @@
       }
       await ladeModelle();
       const letzte = speicherLesen("pp.prozessId");
-      if (letzte) await ladeProzess(letzte, { felderBehalten: Boolean(speicherLesen("pp.entwurf")) });
+      if (letzte && !modellEntwurf) await ladeProzess(letzte, { felderBehalten: Boolean(speicherLesen("pp.entwurf")) });
     } catch (error) {
       if (error.status !== 401) toast(error.message, "error");
     }

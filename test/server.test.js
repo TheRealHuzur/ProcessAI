@@ -84,3 +84,14 @@ test("Anmelden, erzeugen, speichern, laden", async () => {
   assert.equal(geladen.json.aktuell.version, 2);
   assert.equal(geladen.json.versionen.length, 2);
 });
+
+test("Ändern: ohne Modell abgelehnt, mit Modell und Anweisung verarbeitet", async () => {
+  const ohne = await api("/api/aendern", { method: "POST", body: { anweisung: "Antrag prüfen umbenennen", prozess: { elemente: [] } } });
+  assert.equal(ohne.status, 400);
+  const leer = await api("/api/aendern", { method: "POST", body: { anweisung: "", prozess: JSON.parse(beispiel) } });
+  assert.equal(leer.status, 400);
+  const geaendert = await api("/api/aendern", { method: "POST", body: { anweisung: "Bitte nichts ändern.", prozess: JSON.parse(beispiel) } });
+  assert.equal(geaendert.status, 200);
+  assert.ok(geaendert.json.xml.includes("bpmn:definitions"));
+  assert.equal(geaendert.json.aenderung.unveraendert, true);
+});

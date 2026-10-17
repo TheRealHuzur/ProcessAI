@@ -220,6 +220,10 @@ button { font: inherit; cursor: pointer; }
 .befund[data-art="fehler"] { background: var(--rot-bg); color: #7f1d1d; }
 .befund[data-art="hinweis"] { background: var(--orange-bg); color: #7c2d12; }
 .befund[data-art="frage"] { background: rgba(2, 132, 199, 0.07); }
+.befund[data-art="frage"][data-antworten] { cursor: pointer; }
+.befund[data-art="frage"][data-antworten]:hover { outline: 1px solid currentColor; }
+.befund[data-art="aenderung"] { background: var(--gruen-bg); color: #14532d; }
+.befund[data-art="entfernt"] { background: rgba(124, 58, 237, 0.07); color: #4c1d95; }
 .befund[data-element] { cursor: pointer; }
 .befund[data-element]:hover { outline: 1px solid currentColor; }
 .befund .regel { font-weight: 600; margin-right: 4px; opacity: 0.8; }
@@ -251,6 +255,46 @@ button { font: inherit; cursor: pointer; }
 /* Markierungen aus dem Regelcheck */
 .djs-element.pp-fehler .djs-visual > :first-child { stroke: var(--rot) !important; stroke-width: 3px !important; }
 .djs-element.pp-hinweis .djs-visual > :first-child { stroke: #ea580c !important; stroke-width: 2.5px !important; }
+/* Markierungen nach einer Änderung durch die KI */
+.djs-element.pp-neu .djs-visual > :first-child { stroke: var(--gruen) !important; stroke-width: 3px !important; }
+.djs-element.pp-geaendert .djs-visual > :first-child { stroke: #7c3aed !important; stroke-width: 3px !important; }
+
+/* Befehlszeile: Modell per Sprache oder Text ändern */
+.befehl { display: flex; flex-direction: column; gap: 6px; }
+.befehl-zeile { display: flex; align-items: center; gap: 8px; }
+.befehl-zeile .input { flex: 1; min-width: 0; }
+.mic-mini {
+  flex: none;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: none;
+  background: var(--deep);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease;
+}
+.mic-mini svg { width: 18px; height: 18px; stroke: currentColor; fill: none; stroke-width: 2; }
+.mic-mini:hover { background: var(--sky-dark); }
+.mic-mini.is-aktiv { background: var(--rot); animation: puls 1.4s ease-in-out infinite; }
+.mic-mini:disabled { opacity: 0.5; cursor: not-allowed; }
+.befehl-bezug {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  max-width: 100%;
+  padding: 0 2px 0 10px;
+  border-radius: 999px;
+  background: rgba(2, 132, 199, 0.08);
+  color: var(--sky-dark);
+  font-size: 12.5px;
+}
+.befehl-bezug[hidden] { display: none; }
+.befehl-bezug-text { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.befehl-fortschritt { margin: 0; text-align: left; }
 
 .leer-hinweis {
   position: absolute;

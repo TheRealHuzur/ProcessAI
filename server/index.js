@@ -4,7 +4,7 @@ import express from "express";
 import { config, findModel, verfuegbareModelle, ROOT_DIR } from "./config.js";
 import { oeffneDatenbank } from "./db.js";
 import { anmelden, abmelden, istAngemeldet, nurAngemeldet } from "./auth.js";
-import { erzeugeModell } from "./pipeline.js";
+import { erzeugeModell, aendereModell } from "./pipeline.js";
 import { LlmError } from "./llm.js";
 
 export function erstelleApp({ db, llm } = {}) {
@@ -55,6 +55,38 @@ export function erstelleApp({ db, llm } = {}) {
       console.error("Modellerzeugung fehlgeschlagen:", error);
       const status = error instanceof LlmError ? 502 : 500;
       return res.status(status).json({ fehler: error instanceof LlmError ? error.message : "Unerwarteter Fehler bei der Modellerzeugung." });
+    }
+  });
+
+  app.post("/api/aendern", async (req, res) => {
+    const body = req.body || {};
+    const anweisung = String(body.anweisung || "").trim();
+    const modellJson = body.prozess;
+    const bezug = {
+      elementId: String(body.bezug?.elementId || "").trim(),
+      elementName: String(body.bezug?.elementName || "").trim(),
+      frage: String(body.bezug?.frage || "").trim()
+    };
+    const model = findModel(String(body.modell || "")) || verfuegbareModelle()[0] || config.models[0];
+
+    if (anweisung.length < 3) {
+      return res.status(400).json({ fehler: "Bitte sag oder schreib, was sich ändern soll." });
+    }
+    if (anweisung.length > 2000) {
+      return res.status(400).json({ fehler: "Die Anweisung ist zu lang (höchstens 2000 Zeichen)." });
+    }
+    if (!modellJson || typeof modellJson !== "object" || !Array.isArray(modellJson.elemente) || modellJson.elemente.length === 0) {
+      return res.status(400).json({ fehler: "Es gibt noch kein Modell, das geändert werden kann." });
+    }
+
+    const beginn = Date.now();
+    try {
+      const ergebnis = await aendereModell({ modellJson, anweisung, bezug, model, ...(llm ? { llm } : {}) });
+      return res.json({ ...ergebnis, modell: model.id, dauerMs: Date.now() - beginn });
+    } catch (error) {
+      console.error("Modelländerung fehlgeschlagen:", error);
+      const status = error instanceof LlmError ? 502 : 500;
+      return res.status(status).json({ fehler: error instanceof LlmError ? error.message : "Unerwarteter Fehler bei der Änderung." });
     }
   });
 
