@@ -32,7 +32,7 @@ Alles andere (Signal, Eskalation, sendende Zwischenereignisse, zeitbasiertes End
 
 - Jeder Prozess hat mindestens ein Startereignis und mindestens ein Endereignis.
 - Kein Pfad läuft ins Leere, jeder Pfad hat einen sichtbaren Anfang und ein Ende.
-- Ein Prozess beginnt und endet im selben Pool.
+- Ein Prozess beginnt und endet im selben Pool. Das gilt für den Pool, nicht für die Schwimmbahn: Ein Endereignis muss nicht in der Bahn des Startereignisses liegen.
 
 ## 4. Ereignisse allgemein
 
@@ -71,6 +71,7 @@ Alles andere (Signal, Eskalation, sendende Zwischenereignisse, zeitbasiertes End
 ## 7. Endereignisse
 
 - Genau ein eingehender, kein ausgehender Sequenzfluss.
+- Ein Endereignis liegt in der Schwimmbahn des Schritts davor. Für ein Endereignis wird die Bahn nicht gewechselt.
 - Beschriftung beschreibt den Endzustand, z. B. "Antrag ist abgelehnt".
 - Fachlich unterschiedliche Ergebnisse bekommen unterschiedliche Endereignisse. Kein pauschales "Prozess beendet".
 - Unbestimmt: Standardabschluss.
@@ -167,7 +168,8 @@ Die Anordnung übernimmt die App, die KI liefert keine Koordinaten. Diese Regeln
 3. Führen mehrere Sequenzflüsse aus einem Gateway heraus oder in eines hinein, nutzen sie nach Möglichkeit unterschiedliche Kanten, nicht dieselbe Kante und keine Ecke.
 4. Zwischen einem Sequenzfluss und einer Schwimmbahngrenze liegt mindestens so viel Abstand wie zwischen einer Aktivität und der Schwimmbahngrenze.
 5. Sequenzflüsse verlaufen nicht durch andere Symbole.
-6. Entstehen Kreuzungen, wird geprüft, ob sich die Ausgänge eines Gateways anders verteilen lassen (anderer Ausgang, andere Zeile für den Nachfolger), sodass die Kreuzung entfällt. Kreuzungen und Überlagerungen so weit wie möglich vermeiden (siehe 13).
+6. Ein Sequenzfluss bleibt in den Schwimmbahnen von Start und Ziel. Verbindet er zwei Elemente derselben Bahn, verlässt er diese Bahn nicht; die Bahn wird bei Bedarf höher.
+7. Entstehen Kreuzungen, wird geprüft, ob sich die Ausgänge eines Gateways anders verteilen lassen (anderer Ausgang, andere Zeile für den Nachfolger), sodass die Kreuzung entfällt. Kreuzungen und Überlagerungen so weit wie möglich vermeiden (siehe 13).
 
 ## Auffälligkeiten zum Klären
 

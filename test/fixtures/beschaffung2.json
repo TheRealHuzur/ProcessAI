@@ -1,0 +1,463 @@
+{
+ "prozessname": "Beschaffungsprozess (Fachbereich)",
+ "pool": "Fachbereich",
+ "rollen": [
+  {
+   "id": "Rolle_Sachbearbeitung",
+   "name": "Sachbearbeitung"
+  },
+  {
+   "id": "Rolle_Teamleitung",
+   "name": "Teamleitung"
+  },
+  {
+   "id": "Rolle_Vergabestelle",
+   "name": "Vergabestelle"
+  }
+ ],
+ "externe": [
+  {
+   "id": "Extern_Lieferant",
+   "name": "Lieferant"
+  },
+  {
+   "id": "Extern_Kaemmerei",
+   "name": "Kämmerei"
+  }
+ ],
+ "elemente": [
+  {
+   "id": "Start_Sachbearbeitung_Bedarf",
+   "typ": "start",
+   "art": "unbestimmt",
+   "name": "Bedarf ist vorhanden",
+   "rolle": "Rolle_Sachbearbeitung",
+   "beschreibung": ""
+  },
+  {
+   "id": "Aufgabe_Sachbearbeitung_AntragAusfuellen",
+   "typ": "aufgabe",
+   "name": "Beschaffungsantrag ausfüllen und einreichen",
+   "rolle": "Rolle_Sachbearbeitung",
+   "beschreibung": ""
+  },
+  {
+   "id": "Gateway_Teamleitung_AntragEingegangen",
+   "typ": "xor",
+   "name": "",
+   "rolle": "Rolle_Teamleitung"
+  },
+  {
+   "id": "Aufgabe_Teamleitung_AntragPruefen",
+   "typ": "aufgabe",
+   "name": "Antrag prüfen",
+   "rolle": "Rolle_Teamleitung",
+   "beschreibung": ""
+  },
+  {
+   "id": "Gateway_Teamleitung_ITBetroffen",
+   "typ": "xor",
+   "name": "",
+   "rolle": "Rolle_Teamleitung"
+  },
+  {
+   "id": "Aufgabe_Teamleitung_ITStellungnahmenEinholen",
+   "typ": "aufgabe",
+   "name": "IT-Stellungnahme einholen",
+   "rolle": "Rolle_Teamleitung",
+   "beschreibung": ""
+  },
+  {
+   "id": "Gateway_Zusammenfuehrung_IT",
+   "typ": "xor",
+   "name": "",
+   "rolle": "Rolle_Teamleitung"
+  },
+  {
+   "id": "Gateway_Teamleitung_Entscheidung",
+   "typ": "xor",
+   "name": "",
+   "rolle": "Rolle_Teamleitung"
+  },
+  {
+   "id": "Gateway_Sachbearbeitung_Nachbesserung",
+   "typ": "xor",
+   "name": "",
+   "rolle": "Rolle_Sachbearbeitung"
+  },
+  {
+   "id": "Aufgabe_Sachbearbeitung_AntragUeberarbeiten",
+   "typ": "aufgabe",
+   "name": "Antrag überarbeiten",
+   "rolle": "Rolle_Sachbearbeitung",
+   "beschreibung": ""
+  },
+  {
+   "id": "End_Sachbearbeitung_VorgangBeendet",
+   "typ": "ende",
+   "art": "unbestimmt",
+   "name": "Vorgang ist beendet",
+   "rolle": "Rolle_Sachbearbeitung"
+  },
+  {
+   "id": "Gateway_Teamleitung_Betragsgrenze",
+   "typ": "xor",
+   "name": "",
+   "rolle": "Rolle_Teamleitung"
+  },
+  {
+   "id": "Aufgabe_Sachbearbeitung_BestellungDurchfuehren",
+   "typ": "aufgabe",
+   "name": "Bestellung durchführen",
+   "rolle": "Rolle_Sachbearbeitung",
+   "beschreibung": ""
+  },
+  {
+   "id": "Gateway_Sachbearbeitung_LieferungErwarten",
+   "typ": "xor",
+   "name": "",
+   "rolle": "Rolle_Sachbearbeitung"
+  },
+  {
+   "id": "Zwischen_Sachbearbeitung_WareEingegangen",
+   "typ": "zwischen",
+   "art": "nachricht",
+   "name": "Ware ist eingegangen",
+   "rolle": "Rolle_Sachbearbeitung",
+   "beschreibung": ""
+  },
+  {
+   "id": "Aufgabe_Sachbearbeitung_WarePruefen",
+   "typ": "aufgabe",
+   "name": "Ware prüfen",
+   "rolle": "Rolle_Sachbearbeitung",
+   "beschreibung": ""
+  },
+  {
+   "id": "Gateway_Sachbearbeitung_WareInOrdnung",
+   "typ": "xor",
+   "name": "",
+   "rolle": "Rolle_Sachbearbeitung"
+  },
+  {
+   "id": "Aufgabe_Sachbearbeitung_RechnungWeiterleiten",
+   "typ": "aufgabe",
+   "name": "Rechnung an Kämmerei weiterleiten",
+   "rolle": "Rolle_Sachbearbeitung",
+   "beschreibung": ""
+  },
+  {
+   "id": "End_Sachbearbeitung_VorgangAbgeschlossen",
+   "typ": "ende",
+   "art": "unbestimmt",
+   "name": "Vorgang ist abgeschlossen",
+   "rolle": "Rolle_Sachbearbeitung"
+  },
+  {
+   "id": "Aufgabe_Sachbearbeitung_ReklamationSenden",
+   "typ": "aufgabe",
+   "name": "Reklamation an Lieferanten senden",
+   "rolle": "Rolle_Sachbearbeitung",
+   "beschreibung": ""
+  },
+  {
+   "id": "End_Sachbearbeitung_ReklamationVersendet",
+   "typ": "ende",
+   "art": "unbestimmt",
+   "name": "Reklamation ist versendet",
+   "rolle": "Rolle_Sachbearbeitung"
+  },
+  {
+   "id": "Gateway_Vergabestelle_ParallelStart",
+   "typ": "und",
+   "name": "",
+   "rolle": "Rolle_Vergabestelle"
+  },
+  {
+   "id": "Gateway_Vergabestelle_ParallelEnd",
+   "typ": "und",
+   "name": "",
+   "rolle": "Rolle_Vergabestelle"
+  },
+  {
+   "id": "Aufgabe_Vergabestelle_AngeboteEinholen",
+   "typ": "aufgabe",
+   "name": "Angebote einholen",
+   "rolle": "Rolle_Vergabestelle",
+   "beschreibung": ""
+  },
+  {
+   "id": "Aufgabe_Vergabestelle_MittelabfrageDurchfuehren",
+   "typ": "aufgabe",
+   "name": "Mittelabfrage durchführen",
+   "rolle": "Rolle_Vergabestelle",
+   "beschreibung": ""
+  },
+  {
+   "id": "Gateway_Vergabestelle_MittelVorhanden",
+   "typ": "xor",
+   "name": "",
+   "rolle": "Rolle_Vergabestelle"
+  },
+  {
+   "id": "Aufgabe_Vergabestelle_AbsageSenden",
+   "typ": "aufgabe",
+   "name": "Absage an Fachbereich senden",
+   "rolle": "Rolle_Vergabestelle",
+   "beschreibung": ""
+  },
+  {
+   "id": "End_Sachbearbeitung_BeschaffungAbgelehnt",
+   "typ": "ende",
+   "art": "unbestimmt",
+   "name": "Beschaffung ist abgelehnt",
+   "rolle": "Rolle_Sachbearbeitung"
+  },
+  {
+   "id": "Aufgabe_Vergabestelle_AngebotAuswaehlen",
+   "typ": "aufgabe",
+   "name": "Wirtschaftlichstes Angebot auswählen",
+   "rolle": "Rolle_Vergabestelle",
+   "beschreibung": ""
+  },
+  {
+   "id": "Aufgabe_Vergabestelle_AuftragErteilen",
+   "typ": "aufgabe",
+   "name": "Auftrag erteilen",
+   "rolle": "Rolle_Vergabestelle",
+   "beschreibung": ""
+  }
+ ],
+ "fluesse": [
+  {
+   "id": "Flow_StartToAntragAusfuellen",
+   "von": "Start_Sachbearbeitung_Bedarf",
+   "nach": "Aufgabe_Sachbearbeitung_AntragAusfuellen",
+   "name": ""
+  },
+  {
+   "id": "Flow_AntragAusfuellenToGatewayEingang",
+   "von": "Aufgabe_Sachbearbeitung_AntragAusfuellen",
+   "nach": "Gateway_Teamleitung_AntragEingegangen",
+   "name": ""
+  },
+  {
+   "id": "Flow_GatewayEingangToPruefen",
+   "von": "Gateway_Teamleitung_AntragEingegangen",
+   "nach": "Aufgabe_Teamleitung_AntragPruefen",
+   "name": ""
+  },
+  {
+   "id": "Flow_PruefenToITBetroffen",
+   "von": "Aufgabe_Teamleitung_AntragPruefen",
+   "nach": "Gateway_Teamleitung_ITBetroffen",
+   "name": ""
+  },
+  {
+   "id": "Flow_ITBetroffen_Ja",
+   "von": "Gateway_Teamleitung_ITBetroffen",
+   "nach": "Aufgabe_Teamleitung_ITStellungnahmenEinholen",
+   "name": "IT betroffen"
+  },
+  {
+   "id": "Flow_ITBetroffen_Nein",
+   "von": "Gateway_Teamleitung_ITBetroffen",
+   "nach": "Gateway_Zusammenfuehrung_IT",
+   "name": "IT nicht betroffen"
+  },
+  {
+   "id": "Flow_StellungnahmeToZusammenfuehrung",
+   "von": "Aufgabe_Teamleitung_ITStellungnahmenEinholen",
+   "nach": "Gateway_Zusammenfuehrung_IT",
+   "name": ""
+  },
+  {
+   "id": "Flow_ZusammenfuehrungToEntscheidung",
+   "von": "Gateway_Zusammenfuehrung_IT",
+   "nach": "Gateway_Teamleitung_Entscheidung",
+   "name": ""
+  },
+  {
+   "id": "Flow_Entscheidung_Abgelehnt",
+   "von": "Gateway_Teamleitung_Entscheidung",
+   "nach": "Gateway_Sachbearbeitung_Nachbesserung",
+   "name": "abgelehnt"
+  },
+  {
+   "id": "Flow_Entscheidung_Genehmigt",
+   "von": "Gateway_Teamleitung_Entscheidung",
+   "nach": "Gateway_Teamleitung_Betragsgrenze",
+   "name": "genehmigt"
+  },
+  {
+   "id": "Flow_Nachbesserung_Ueberarbeiten",
+   "von": "Gateway_Sachbearbeitung_Nachbesserung",
+   "nach": "Aufgabe_Sachbearbeitung_AntragUeberarbeiten",
+   "name": "überarbeiten"
+  },
+  {
+   "id": "Flow_Nachbesserung_Beenden",
+   "von": "Gateway_Sachbearbeitung_Nachbesserung",
+   "nach": "End_Sachbearbeitung_VorgangBeendet",
+   "name": "beenden"
+  },
+  {
+   "id": "Flow_Ueberarbeiten_Zurueck",
+   "von": "Aufgabe_Sachbearbeitung_AntragUeberarbeiten",
+   "nach": "Gateway_Teamleitung_AntragEingegangen",
+   "name": ""
+  },
+  {
+   "id": "Flow_Betragsgrenze_Unter2000",
+   "von": "Gateway_Teamleitung_Betragsgrenze",
+   "nach": "Aufgabe_Sachbearbeitung_BestellungDurchfuehren",
+   "name": "unter 2000 EUR"
+  },
+  {
+   "id": "Flow_Betragsgrenze_Ab2000",
+   "von": "Gateway_Teamleitung_Betragsgrenze",
+   "nach": "Gateway_Vergabestelle_ParallelStart",
+   "name": "ab 2000 EUR"
+  },
+  {
+   "id": "Flow_ParallelStart_Angebote",
+   "von": "Gateway_Vergabestelle_ParallelStart",
+   "nach": "Aufgabe_Vergabestelle_AngeboteEinholen",
+   "name": ""
+  },
+  {
+   "id": "Flow_ParallelStart_Mittelabfrage",
+   "von": "Gateway_Vergabestelle_ParallelStart",
+   "nach": "Aufgabe_Vergabestelle_MittelabfrageDurchfuehren",
+   "name": ""
+  },
+  {
+   "id": "Flow_AngeboteToParallelEnd",
+   "von": "Aufgabe_Vergabestelle_AngeboteEinholen",
+   "nach": "Gateway_Vergabestelle_ParallelEnd",
+   "name": ""
+  },
+  {
+   "id": "Flow_MittelabfrageToParallelEnd",
+   "von": "Aufgabe_Vergabestelle_MittelabfrageDurchfuehren",
+   "nach": "Gateway_Vergabestelle_ParallelEnd",
+   "name": ""
+  },
+  {
+   "id": "Flow_ParallelEndToMittelVorhanden",
+   "von": "Gateway_Vergabestelle_ParallelEnd",
+   "nach": "Gateway_Vergabestelle_MittelVorhanden",
+   "name": ""
+  },
+  {
+   "id": "Flow_MittelVorhanden_Absage",
+   "von": "Gateway_Vergabestelle_MittelVorhanden",
+   "nach": "Aufgabe_Vergabestelle_AbsageSenden",
+   "name": "Mittel nicht vorhanden"
+  },
+  {
+   "id": "Flow_AbsageToEnd",
+   "von": "Aufgabe_Vergabestelle_AbsageSenden",
+   "nach": "End_Sachbearbeitung_BeschaffungAbgelehnt",
+   "name": ""
+  },
+  {
+   "id": "Flow_MittelVorhanden_Auswaehlen",
+   "von": "Gateway_Vergabestelle_MittelVorhanden",
+   "nach": "Aufgabe_Vergabestelle_AngebotAuswaehlen",
+   "name": "Mittel vorhanden"
+  },
+  {
+   "id": "Flow_AuswaehlenToAuftrag",
+   "von": "Aufgabe_Vergabestelle_AngebotAuswaehlen",
+   "nach": "Aufgabe_Vergabestelle_AuftragErteilen",
+   "name": ""
+  },
+  {
+   "id": "Flow_AuftragToLieferungErwarten",
+   "von": "Aufgabe_Vergabestelle_AuftragErteilen",
+   "nach": "Gateway_Sachbearbeitung_LieferungErwarten",
+   "name": ""
+  },
+  {
+   "id": "Flow_BestellungToLieferungErwarten",
+   "von": "Aufgabe_Sachbearbeitung_BestellungDurchfuehren",
+   "nach": "Gateway_Sachbearbeitung_LieferungErwarten",
+   "name": ""
+  },
+  {
+   "id": "Flow_LieferungErwartenToWare",
+   "von": "Gateway_Sachbearbeitung_LieferungErwarten",
+   "nach": "Zwischen_Sachbearbeitung_WareEingegangen",
+   "name": ""
+  },
+  {
+   "id": "Flow_WareToPruefen",
+   "von": "Zwischen_Sachbearbeitung_WareEingegangen",
+   "nach": "Aufgabe_Sachbearbeitung_WarePruefen",
+   "name": ""
+  },
+  {
+   "id": "Flow_PruefenToInOrdnung",
+   "von": "Aufgabe_Sachbearbeitung_WarePruefen",
+   "nach": "Gateway_Sachbearbeitung_WareInOrdnung",
+   "name": ""
+  },
+  {
+   "id": "Flow_InOrdnung_Ja",
+   "von": "Gateway_Sachbearbeitung_WareInOrdnung",
+   "nach": "Aufgabe_Sachbearbeitung_RechnungWeiterleiten",
+   "name": "in Ordnung"
+  },
+  {
+   "id": "Flow_InOrdnung_Nein",
+   "von": "Gateway_Sachbearbeitung_WareInOrdnung",
+   "nach": "Aufgabe_Sachbearbeitung_ReklamationSenden",
+   "name": "nicht in Ordnung"
+  },
+  {
+   "id": "Flow_RechnungToEnd",
+   "von": "Aufgabe_Sachbearbeitung_RechnungWeiterleiten",
+   "nach": "End_Sachbearbeitung_VorgangAbgeschlossen",
+   "name": ""
+  },
+  {
+   "id": "Flow_ReklamationToEnd",
+   "von": "Aufgabe_Sachbearbeitung_ReklamationSenden",
+   "nach": "End_Sachbearbeitung_ReklamationVersendet",
+   "name": ""
+  }
+ ],
+ "nachrichten": [
+  {
+   "id": "Msg1",
+   "von": "Extern_Lieferant",
+   "nach": "Zwischen_Sachbearbeitung_WareEingegangen",
+   "name": "Lieferung"
+  },
+  {
+   "id": "Msg2",
+   "von": "Aufgabe_Vergabestelle_AuftragErteilen",
+   "nach": "Extern_Lieferant",
+   "name": "Auftrag"
+  },
+  {
+   "id": "Msg3",
+   "von": "Aufgabe_Sachbearbeitung_RechnungWeiterleiten",
+   "nach": "Extern_Kaemmerei",
+   "name": "Rechnung"
+  }
+ ],
+ "daten": [],
+ "unklarheiten": [
+  "Was passiert nach einer Reklamation? Wird Ersatz geliefert oder endet der Prozess?",
+  "Wie genau wird die Frist von zwei Wochen bei der Mittelabfrage gehandhabt? (Wir haben die Erinnerung in der Aufgabe 'Mittelabfrage durchführen' zusammengefasst, aber die Beschreibung deutet auf eine explizite Zeitsteuerung hin.)",
+  "Ist die Kämmerei eine interne oder externe Stelle? (Wir haben sie als extern modelliert.)",
+  "Wer erhält die Absage bei fehlenden Mitteln? (Wir haben einen Sequenzfluss zur Sachbearbeitung modelliert, aber die Absage könnte auch an die Teamleitung gehen.)"
+ ],
+ "nicht_modelliert": [
+  "Die Teamleitung bindet bei IT-Sachen die IT ein und erhält eine Stellungnahme; dies wurde als Aufgabe 'IT-Stellungnahme einholen' modelliert, ohne die IT als eigene Rolle.",
+  "Die Vergabestelle sendet bei der Mittelabfrage eine Erinnerung, wenn keine Antwort nach zwei Wochen; diese Details sind in der Aufgabe 'Mittelabfrage durchführen' enthalten.",
+  "Die Absage bei fehlenden Mitteln wird an den Fachbereich gesendet; modelliert als Sequenzfluss zur Sachbearbeitung."
+ ]
+}

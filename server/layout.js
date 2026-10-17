@@ -42,6 +42,7 @@ const DATEN_ABSTAND = 44;
 const KOSTEN = {
   form: 1000,
   ueberlagerung: 400,
+  bahnfremd: 500,
   bahngrenze: 300,
   seiteDoppelt: 200,
   kreuzung: 40,
@@ -490,9 +491,21 @@ function wegeErzeugen(z, geo, P, sp, Q, sq) {
   return wege;
 }
 
+// Regel 17.6: Ein Sequenzfluss bleibt in den Bahnen zwischen Start und Ziel (beide eingeschlossen)
+function erlaubterBereich(geo, quelleId, zielId) {
+  const bahnen = [quelleId, zielId].map((id) => geo.bahnGeo.findIndex((b) => {
+    const s = geo.shapes.get(id);
+    return s.y >= b.top && s.y + s.h <= b.bottom;
+  }));
+  if (bahnen.includes(-1)) return null;
+  return { oben: geo.bahnGeo[Math.min(...bahnen)].top, unten: geo.bahnGeo[Math.max(...bahnen)].bottom };
+}
+
 function wegKosten(z, geo, pts, quelleId, zielId, korridore) {
   const segs = segmente(pts);
   let kosten = (pts.length - 2) * KOSTEN.knick + korridore * KOSTEN.korridor;
+  const bereich = erlaubterBereich(geo, quelleId, zielId);
+  if (bereich && pts.some((p) => p.y < bereich.oben || p.y > bereich.unten)) kosten += KOSTEN.bahnfremd;
   segs.forEach((s, i) => {
     kosten += (Math.abs(s.a.x - s.b.x) + Math.abs(s.a.y - s.b.y)) * KOSTEN.laenge;
     for (const [id, box] of geo.shapes) {

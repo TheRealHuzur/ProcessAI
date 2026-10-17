@@ -42,10 +42,28 @@ export function ergaenzeZusammenfuehrungen(modell) {
   return hinweise;
 }
 
+// Regelwerk §7: Ein Endereignis liegt in der Schwimmbahn des Schritts davor.
+// Rein formale Korrektur ohne neuen Inhalt, deshalb macht die App sie selbst.
+export function endereignisseInBahn(modell) {
+  const hinweise = [];
+  if (modell.rollen.length < 2) return hinweise;
+  const byId = new Map(modell.elemente.map((e) => [e.id, e]));
+  const rollenName = new Map(modell.rollen.map((r) => [r.id, r.name]));
+  for (const ende of modell.elemente.filter((e) => e.typ === "ende")) {
+    const eingehend = modell.fluesse.filter((f) => f.nach === ende.id);
+    if (eingehend.length !== 1) continue;
+    const vorher = byId.get(eingehend[0].von);
+    if (!vorher || vorher.rolle === ende.rolle) continue;
+    hinweise.push({ regel: "§7", element: ende.id, text: `"${ende.name || ende.id}" lag in der Bahn "${rollenName.get(ende.rolle) || ende.rolle}". Die App hat das Endereignis in die Bahn des Schritts davor verschoben ("${rollenName.get(vorher.rolle) || vorher.rolle}").` });
+    ende.rolle = vorher.rolle;
+  }
+  return hinweise;
+}
+
 // Modell aus JSON bauen, ohne KI. Wird auch von Tests verwendet.
 export function bauenAusJson(roh) {
   const { modell, probleme } = normalisiereModell(roh);
-  const automatisch = ergaenzeZusammenfuehrungen(modell);
+  const automatisch = [...ergaenzeZusammenfuehrungen(modell), ...endereignisseInBahn(modell)];
   const pruefung = pruefeModell(modell);
   pruefung.hinweise = [...automatisch, ...pruefung.hinweise];
   return { modell, probleme, pruefung };

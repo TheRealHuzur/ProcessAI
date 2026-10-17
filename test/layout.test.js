@@ -12,7 +12,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const lade = (datei) => JSON.parse(fs.readFileSync(path.join(__dirname, datei), "utf8"));
 const MODELLE = {
   beispiel: lade("../examples/antrag-beispielmodell.json"),
-  beschaffung: lade("fixtures/beschaffung.json")
+  beschaffung: lade("fixtures/beschaffung.json"),
+  beschaffung2: lade("fixtures/beschaffung2.json")
 };
 const GATEWAYS = new Set(["bpmn:ExclusiveGateway", "bpmn:ParallelGateway", "bpmn:EventBasedGateway"]);
 
@@ -107,6 +108,29 @@ for (const [name, roh] of Object.entries(MODELLE)) {
     }
   });
 }
+
+for (const [name, roh] of Object.entries(MODELLE)) {
+  test(`${name}: Sequenzflüsse bleiben in den Bahnen von Start und Ziel (17.6)`, async () => {
+    const { fluesse, boxen, wege, lanes } = await diagramm(roh);
+    if (lanes.length < 2) return;
+    const bahnVon = (id) => lanes.findIndex((l) => (l.flowNodeRef || []).some((n) => n.id === id));
+    for (const fluss of fluesse) {
+      const indizes = [bahnVon(fluss.sourceRef.id), bahnVon(fluss.targetRef.id)];
+      const oben = boxen.get(lanes[Math.min(...indizes)].id).y;
+      const untenBox = boxen.get(lanes[Math.max(...indizes)].id);
+      const unten = untenBox.y + untenBox.height;
+      for (const p of wege.get(fluss.id)) assert.ok(p.y >= oben && p.y <= unten, `${fluss.id} verlässt die Bahnen von Start und Ziel`);
+    }
+  });
+}
+
+test("Endereignis liegt in der Bahn des Schritts davor (7)", () => {
+  const { modell, pruefung } = bauenAusJson(MODELLE.beschaffung2);
+  const ende = modell.elemente.find((e) => e.typ === "ende" && e.name === "Beschaffung ist abgelehnt");
+  const vorher = modell.elemente.find((e) => e.id === modell.fluesse.find((f) => f.nach === ende.id).von);
+  assert.equal(ende.rolle, vorher.rolle);
+  assert.ok(pruefung.hinweise.some((h) => h.element === ende.id && h.regel === "§7"));
+});
 
 test("Datenobjekt steht an jeder Aufgabe einzeln, mit der passenden Verbindung (16, 17.1)", async () => {
   const { prozess, wege } = await diagramm(MODELLE.beschaffung);
