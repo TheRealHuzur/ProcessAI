@@ -31,6 +31,22 @@ export const PROVIDERS = {
   }
 };
 
+// Bekannte Myra-Modelle. Die EU-Flotte läuft bei Myra selbst, Claude wird über Myra an Anthropic weitergeleitet.
+const MYRA_KATALOG = {
+  "qwen3.8-27b": "Qwen 3.8 27B (Myra, EU-Flotte)",
+  "mistral-small-4": "Mistral Small 4 (Myra, EU-Flotte)",
+  "gemma-4-31b-it": "Gemma 4 31B (Myra, EU-Flotte)",
+  "claude-haiku-4-5": "Claude Haiku 4.5 (über Myra)",
+  "claude-sonnet-5": "Claude Sonnet 5 (über Myra)"
+};
+const MYRA_STANDARD = ["qwen3.8-27b", "mistral-small-4", "gemma-4-31b-it"];
+
+// MYRA_MODELLE: kommagetrennte Modell-IDs, die am Myra-Gateway freigeschaltet sind. Ohne Angabe die EU-Flotte.
+function myraModelle() {
+  const ids = String(process.env.MYRA_MODELLE || "").split(",").map((id) => id.trim()).filter(Boolean);
+  return (ids.length ? ids : MYRA_STANDARD).map((id) => ({ id: `myra/${id}`, apiModel: id, label: MYRA_KATALOG[id] || `${id} (Myra)`, provider: "myra" }));
+}
+
 // Akzeptiert die Basisadresse auch mit angehängtem /chat/completions oder Schrägstrich
 function basisAdresse(wert) {
   return String(wert || "").trim().replace(/\/chat\/completions\/?$/, "").replace(/\/+$/, "");
@@ -42,10 +58,8 @@ const DEFAULT_MODELS = [
   { id: "mistralai/mistral-small-2603", label: "Mistral Small 4", provider: "openrouter" },
   // Direkt bei Mistral (EU). Erscheint nur, wenn MISTRAL_API_KEY gesetzt ist.
   { id: "mistral/mistral-small-latest", apiModel: "mistral-small-latest", label: "Mistral Small (direkt bei Mistral, EU)", provider: "mistral" },
-  // Myra, Modelle auf Myras eigener Infrastruktur in der EU. Erscheinen nur mit MYRA_API_KEY und MYRA_BASE_URL.
-  { id: "myra/qwen3.8-27b", apiModel: "qwen3.8-27b", label: "Qwen 3.8 27B (Myra, EU)", provider: "myra" },
-  { id: "myra/mistral-small-4", apiModel: "mistral-small-4", label: "Mistral Small 4 (Myra, EU)", provider: "myra" },
-  { id: "myra/gemma-4-31b-it", apiModel: "gemma-4-31b-it", label: "Gemma 4 31B (Myra, EU)", provider: "myra" }
+  // Myra: erscheinen nur mit MYRA_API_KEY und MYRA_BASE_URL, Auswahl über MYRA_MODELLE
+  ...myraModelle()
 ];
 
 function readModels() {

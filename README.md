@@ -35,6 +35,7 @@ Build-Pack **Dockerfile**, Port **3000**, Domain `https://prozesspilot.wissen-un
 | `MISTRAL_API_KEY` | nein | schaltet "Mistral Small (direkt bei Mistral, EU)" frei |
 | `MYRA_BASE_URL` | nein | Myra-Adresse mit Mandant und Gateway, z. B. `https://ai.myra.eu/v1/<mandant>/<gateway>/compat` |
 | `MYRA_API_KEY` | nein | Gateway-Token von Myra (`myra_…`); mit `MYRA_BASE_URL` erscheinen die Myra-Modelle |
+| `MYRA_MODELLE` | nein | am Myra-Gateway freigeschaltete Modelle, kommagetrennt, z. B. `claude-haiku-4-5`; ohne Angabe die EU-Flotte |
 | `MODELS_JSON` | nein | eigene Modellliste, siehe `server/config.js` |
 
 ## Mehr

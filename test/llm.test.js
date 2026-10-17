@@ -53,6 +53,18 @@ test("Myra erscheint erst mit Adresse und Token, Adresse wird bereinigt", async 
   assert.ok(!verfuegbareModelle().some((m) => m.provider === "myra"));
 });
 
+test("MYRA_MODELLE legt die Myra-Modelle fest, auch unbekannte", async () => {
+  process.env.MYRA_API_KEY = "myra_test";
+  process.env.MYRA_BASE_URL = "https://ai.myra.eu/v1/mandant/gateway/compat";
+  process.env.MYRA_MODELLE = "claude-haiku-4-5, neues-modell";
+  const { verfuegbareModelle } = await import(`../server/config.js?modelle=${Date.now()}`);
+  const myra = verfuegbareModelle().filter((m) => m.provider === "myra");
+  assert.deepEqual(myra.map((m) => m.apiModel), ["claude-haiku-4-5", "neues-modell"]);
+  assert.equal(myra[0].label, "Claude Haiku 4.5 (über Myra)");
+  delete process.env.MYRA_MODELLE;
+  delete process.env.MYRA_API_KEY;
+});
+
 test("Myra-Regelverstoß mit 403 wird verständlich gemeldet", async () => {
   const original = globalThis.fetch;
   globalThis.fetch = async () => antwort(403, { error: { code: "model_disabled_on_gateway", message: "Model is disabled on this gateway" } });
