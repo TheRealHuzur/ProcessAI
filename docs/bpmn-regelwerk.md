@@ -1,6 +1,6 @@
 # BPMN-Regelwerk für ProzessPilot (Rohfassung)
 
-Stand: 14.10.2026
+Stand: 17.10.2026 (Phase 3: Datenobjekte je Aufgabe, Tokenprinzip, Darstellungsregeln)
 Quelle: Wiki wissen-und-werkzeug.de, Abschnitt BPMN (13 Seiten), plus Elementvorrat Modus Basis aus bpmndesk.
 Status: Erste Zusammenstellung, menschenlesbar. Wird noch verfeinert und für die KI aufbereitet.
 Diese Datei wird zur Laufzeit in den Systemprompt der KI eingelesen.
@@ -111,6 +111,11 @@ Alles andere (Signal, Eskalation, sendende Zwischenereignisse, zeitbasiertes End
 - Verzweigung: alle Pfade werden aktiviert. Für echte Gleichzeitigkeit oder Aufgaben, deren Reihenfolge egal ist, die aber alle erledigt werden müssen.
 - Zusammenführung: wartet, bis alle Pfade angekommen sind.
 - Häufigster Fehler ist eine falsche Zusammenführung, sie führt zu hängenden Pfaden.
+- Tokenprinzip: Die Verzweigung erzeugt je Ausgang einen Token. Die Zusammenführung läuft erst weiter, wenn auf jedem Eingang ein Token angekommen ist.
+- Deshalb muss jeder Pfad nach einer parallelen Verzweigung die zugehörige Zusammenführung erreichen. Er darf vorher nicht in einem Endereignis enden. Sonst wartet der Token des anderen Pfads für immer, und der Vorgang wird nie abgeschlossen.
+- Eine Entscheidung, die den ganzen Vorgang beenden kann (z. B. "keine Mittel", "Frist verstreicht"), gehört vor die Verzweigung oder hinter die Zusammenführung. Beide Pfade laufen dann zuerst zusammen, danach wird entschieden.
+- Parallele Pfade nie über ein exklusives Gateway zusammenführen. Die Schritte danach würden mehrfach ausgeführt.
+- Das terminierende Endereignis, das alle Token beendet, gehört nicht zum Basis-Level und wird nicht verwendet.
 
 ## 12. Ereignisbasiertes Gateway
 
@@ -149,12 +154,23 @@ Alles andere (Signal, Eskalation, sendende Zwischenereignisse, zeitbasiertes End
 - Datenobjekt: Transportmedium einer Information (Dokument, Datei, Telefonat). Datenspeicher: dauerhafte Ablage (Datenbank, Aktenschrank).
 - Verbindung über Datenassoziation: Pfeil zur Aufgabe = lesen, Pfeil zum Datenobjekt = erzeugen.
 - Zustand in eckigen Klammern am Namen, z. B. "Rechnung [geprüft]".
-- Wird eine Information später erneut gebraucht, darf das Datenobjekt ein zweites Mal eingezeichnet werden.
+- Ein Datenobjekt oder Datenspeicher wird an jeder Aufgabe, zu der es gehört, einzeln dargestellt, jeweils mit der passenden Verbindung zu dieser Aufgabe. Ein Beschaffungsantrag, den eine Aufgabe erzeugt und drei Aufgaben lesen, steht also viermal im Modell. Fachlich bleibt es dasselbe Datenobjekt.
 - Datenobjekte gelten nur innerhalb eines Pools.
 - Sparsam einsetzen, nur wenn sie die Lesbarkeit erhöhen.
 
+## 17. Darstellung und Anordnung
+
+Die Anordnung übernimmt die App, die KI liefert keine Koordinaten. Diese Regeln gelten für die automatische Anordnung und für die Prüfung von Hand.
+
+1. Datenobjekte stehen einzeln an jeder Aufgabe, zu der sie gehören (siehe 16).
+2. Sequenzflüsse gehen bei Aufgaben und Ereignissen links ein und rechts aus.
+3. Führen mehrere Sequenzflüsse aus einem Gateway heraus oder in eines hinein, nutzen sie nach Möglichkeit unterschiedliche Kanten, nicht dieselbe Kante und keine Ecke.
+4. Zwischen einem Sequenzfluss und einer Schwimmbahngrenze liegt mindestens so viel Abstand wie zwischen einer Aktivität und der Schwimmbahngrenze.
+5. Sequenzflüsse verlaufen nicht durch andere Symbole.
+6. Entstehen Kreuzungen, wird geprüft, ob sich die Ausgänge eines Gateways anders verteilen lassen (anderer Ausgang, andere Zeile für den Nachfolger), sodass die Kreuzung entfällt. Kreuzungen und Überlagerungen so weit wie möglich vermeiden (siehe 13).
+
 ## Auffälligkeiten zum Klären
 
-- Die Seite zu Gateway-Grundlagen nennt vier Basis-Gateways inklusive inklusivem Gateway (OR), bpmndesk Basis enthält kein OR. Für ProzessPilot gilt vorerst der bpmndesk-Vorrat.
+- Inklusives Gateway (OR): Die Seite zu Gateway-Grundlagen nennt es, bpmndesk Basis enthält es nicht. Entscheidung 17.10.2026: vorerst nicht aufnehmen, es gilt der bpmndesk-Vorrat.
 - Beschriftung von Ereignissen: meist Vollzugsform ("ist eingegangen"), bei Zwischenereignissen auch Präsens ("Angebot geht ein"). Einheitlich festlegen.
 - Die Seite zu Startereignissen verweist auf eine Modellierungskonvention zum Download auf der Werkzeugseite. Prüfen, ob dort weitere Regeln stehen.

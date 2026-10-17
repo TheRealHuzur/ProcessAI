@@ -53,16 +53,18 @@ export function erzeugeBpmnXml(modell, layout) {
     eingehend.get(fluss.nach).push(fluss.id);
   }
 
+  // Jede Darstellung eines Datenobjekts (eine je Aufgabe, siehe layout.js) hat eigene Assoziationen
+  const refs = layout.datenRefs;
   const lesenJeElement = new Map();
   const schreibenJeElement = new Map();
-  for (const daten of modell.daten) {
-    for (const ziel of daten.lesen) {
+  for (const ref of refs) {
+    for (const ziel of ref.lesen) {
       if (!lesenJeElement.has(ziel)) lesenJeElement.set(ziel, []);
-      lesenJeElement.get(ziel).push(daten);
+      lesenJeElement.get(ziel).push(ref);
     }
-    for (const quelle of daten.schreiben) {
+    for (const quelle of ref.schreiben) {
       if (!schreibenJeElement.has(quelle)) schreibenJeElement.set(quelle, []);
-      schreibenJeElement.get(quelle).push(daten);
+      schreibenJeElement.get(quelle).push(ref);
     }
   }
 
@@ -79,6 +81,11 @@ export function erzeugeBpmnXml(modell, layout) {
     push(`    <bpmn:messageFlow id="${nachricht.id}"${attrName(nachricht.name)} sourceRef="${nachricht.von}" targetRef="${nachricht.nach}" />`);
   }
   push(`  </bpmn:collaboration>`);
+
+  // Ein Datenspeicher existiert einmal, seine Darstellungen verweisen darauf
+  for (const daten of modell.daten.filter((d) => d.typ === "datenspeicher")) {
+    push(`  <bpmn:dataStore id="${daten.id}_Store"${attrName(daten.name)} />`);
+  }
 
   push(`  <bpmn:process id="${prozessId}"${attrName(modell.prozessname)} isExecutable="false">`);
 
@@ -107,12 +114,12 @@ export function erzeugeBpmnXml(modell, layout) {
     const schreiben = schreibenJeElement.get(element.id) || [];
     if (lesen.length > 0) {
       push(`      <bpmn:property id="Property_${element.id}" name="__targetRef_placeholder" />`);
-      for (const daten of lesen) {
-        push(`      <bpmn:dataInputAssociation id="DIA_${daten.id}_${element.id}"><bpmn:sourceRef>${daten.id}</bpmn:sourceRef><bpmn:targetRef>Property_${element.id}</bpmn:targetRef></bpmn:dataInputAssociation>`);
+      for (const ref of lesen) {
+        push(`      <bpmn:dataInputAssociation id="DIA_${ref.id}_${element.id}"><bpmn:sourceRef>${ref.id}</bpmn:sourceRef><bpmn:targetRef>Property_${element.id}</bpmn:targetRef></bpmn:dataInputAssociation>`);
       }
     }
-    for (const daten of schreiben) {
-      push(`      <bpmn:dataOutputAssociation id="DOA_${element.id}_${daten.id}"><bpmn:targetRef>${daten.id}</bpmn:targetRef></bpmn:dataOutputAssociation>`);
+    for (const ref of schreiben) {
+      push(`      <bpmn:dataOutputAssociation id="DOA_${element.id}_${ref.id}"><bpmn:targetRef>${ref.id}</bpmn:targetRef></bpmn:dataOutputAssociation>`);
     }
 
     const definition = EVENT_DEFINITION[element.art];
@@ -127,11 +134,14 @@ export function erzeugeBpmnXml(modell, layout) {
   }
 
   for (const daten of modell.daten) {
+    if (daten.typ !== "datenspeicher") push(`    <bpmn:dataObject id="${daten.id}_Object" />`);
+  }
+  for (const ref of refs) {
+    const daten = ref.daten;
     if (daten.typ === "datenspeicher") {
-      push(`    <bpmn:dataStoreReference id="${daten.id}"${attrName(daten.name)} />`);
+      push(`    <bpmn:dataStoreReference id="${ref.id}"${attrName(daten.name)} dataStoreRef="${daten.id}_Store" />`);
     } else {
-      push(`    <bpmn:dataObject id="${daten.id}_Object" />`);
-      push(`    <bpmn:dataObjectReference id="${daten.id}"${attrName(daten.name)} dataObjectRef="${daten.id}_Object" />`);
+      push(`    <bpmn:dataObjectReference id="${ref.id}"${attrName(daten.name)} dataObjectRef="${daten.id}_Object" />`);
     }
   }
 
@@ -152,8 +162,8 @@ export function erzeugeBpmnXml(modell, layout) {
     const extra = element.typ === "teilprozess" ? ` isExpanded="false"` : element.typ === "xor" ? ` isMarkerVisible="true"` : "";
     di.push(`      <bpmndi:BPMNShape id="${element.id}_di" bpmnElement="${element.id}"${extra}>${bounds(layout.shapes.get(element.id))}</bpmndi:BPMNShape>`);
   }
-  for (const daten of modell.daten) {
-    di.push(`      <bpmndi:BPMNShape id="${daten.id}_di" bpmnElement="${daten.id}">${bounds(layout.shapes.get(daten.id))}</bpmndi:BPMNShape>`);
+  for (const ref of refs) {
+    di.push(`      <bpmndi:BPMNShape id="${ref.id}_di" bpmnElement="${ref.id}">${bounds(layout.shapes.get(ref.id))}</bpmndi:BPMNShape>`);
   }
   for (const extern of modell.externe) {
     di.push(`      <bpmndi:BPMNShape id="${extern.id}_di" bpmnElement="${extern.id}" isHorizontal="true">${bounds(layout.externPools.get(extern.id).bounds)}</bpmndi:BPMNShape>`);
@@ -164,13 +174,13 @@ export function erzeugeBpmnXml(modell, layout) {
   for (const nachricht of modell.nachrichten) {
     di.push(`      <bpmndi:BPMNEdge id="${nachricht.id}_di" bpmnElement="${nachricht.id}">${waypoints(layout.kanten.get(nachricht.id))}</bpmndi:BPMNEdge>`);
   }
-  for (const daten of modell.daten) {
-    for (const ziel of daten.lesen) {
-      const id = `DIA_${daten.id}_${ziel}`;
+  for (const ref of refs) {
+    for (const ziel of ref.lesen) {
+      const id = `DIA_${ref.id}_${ziel}`;
       di.push(`      <bpmndi:BPMNEdge id="${id}_di" bpmnElement="${id}">${waypoints(layout.kanten.get(id))}</bpmndi:BPMNEdge>`);
     }
-    for (const quelle of daten.schreiben) {
-      const id = `DOA_${quelle}_${daten.id}`;
+    for (const quelle of ref.schreiben) {
+      const id = `DOA_${quelle}_${ref.id}`;
       di.push(`      <bpmndi:BPMNEdge id="${id}_di" bpmnElement="${id}">${waypoints(layout.kanten.get(id))}</bpmndi:BPMNEdge>`);
     }
   }

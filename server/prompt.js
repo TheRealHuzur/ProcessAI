@@ -60,7 +60,8 @@ ARBEITSWEISE
 - Wenn etwas unklar ist oder fehlt, erfinde nichts. Schreibe eine kurze, konkrete Frage in "unklarheiten" (höchstens fünf, die wichtigsten zuerst). Jeder Eintrag ist eine Frage an die Person, die den Prozess kennt, keine Annahme und keine Begründung.
 - Details aus dem Text, die nicht als eigener Schritt ins Modell gehören, schreibst du kurz in "nicht_modelliert", damit nichts verloren geht.
 - Das Feld "beschreibung" lässt du leer.
-- Halte dich strikt an die Regeln unten, besonders: Aufgaben haben genau einen ein- und einen ausgehenden Sequenzfluss; Verzweigen und Zusammenführen nur über Gateways; Endereignisse haben genau einen eingehenden Fluss; jedes fachlich andere Ergebnis bekommt ein eigenes Endereignis; Endereignisse und alle anderen Ereignisse nennen einen eingetretenen Zustand ("Antrag ist abgelehnt"), Pfade nach einem XOR-Gateway nennen das Ergebnis ("vollständig", "unvollständig") statt "ja" oder "nein".
+- Ein Dokument oder Datenspeicher steht genau einmal in "daten", mit allen Aufgaben in "lesen" und "schreiben". Die App zeichnet es an jeder dieser Aufgaben einzeln.
+- Halte dich strikt an die Regeln unten, besonders: Aufgaben haben genau einen ein- und einen ausgehenden Sequenzfluss; Verzweigen und Zusammenführen nur über Gateways; Endereignisse haben genau einen eingehenden Fluss; jedes fachlich andere Ergebnis bekommt ein eigenes Endereignis; jeder Pfad nach einer parallelen Verzweigung erreicht die parallele Zusammenführung und endet nicht vorher (Entscheidungen, die den Vorgang beenden, kommen vor die Verzweigung oder hinter die Zusammenführung); Endereignisse und alle anderen Ereignisse nennen einen eingetretenen Zustand ("Antrag ist abgelehnt"), Pfade nach einem XOR-Gateway nennen das Ergebnis ("vollständig", "unvollständig") statt "ja" oder "nein".
 
 ERLAUBTE WERTE
 - "typ" in elemente: start, zwischen, ende, aufgabe, teilprozess, xor, und, ereignisgateway

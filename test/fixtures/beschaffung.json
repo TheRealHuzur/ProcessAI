@@ -1,0 +1,555 @@
+{
+ "prozessname": "Beschaffungsprozess (Fachbereich)",
+ "pool": "Eigene Organisation",
+ "rollen": [
+  {
+   "id": "Rolle_Sachbearbeitung",
+   "name": "Sachbearbeitung"
+  },
+  {
+   "id": "Rolle_Teamleitung",
+   "name": "Teamleitung"
+  },
+  {
+   "id": "Rolle_Vergabestelle",
+   "name": "Vergabestelle"
+  },
+  {
+   "id": "Rolle_KaeMMerei",
+   "name": "Kämmerei"
+  },
+  {
+   "id": "Rolle_IT",
+   "name": "IT"
+  }
+ ],
+ "externe": [
+  {
+   "id": "Extern_Lieferant",
+   "name": "Lieferant"
+  }
+ ],
+ "elemente": [
+  {
+   "id": "Start_BedarfErkannt",
+   "typ": "start",
+   "art": "unbestimmt",
+   "name": "Bedarf ist erkannt",
+   "rolle": "Rolle_Sachbearbeitung",
+   "beschreibung": ""
+  },
+  {
+   "id": "Task_AntragAusfuellen",
+   "typ": "aufgabe",
+   "name": "Beschaffungsantrag ausfüllen und einreichen",
+   "rolle": "Rolle_Sachbearbeitung",
+   "beschreibung": ""
+  },
+  {
+   "id": "Task_AntragSichten",
+   "typ": "aufgabe",
+   "name": "Antrag sichten",
+   "rolle": "Rolle_Teamleitung",
+   "beschreibung": ""
+  },
+  {
+   "id": "Gateway_ITRelevant",
+   "typ": "xor",
+   "name": "",
+   "rolle": "Rolle_Teamleitung"
+  },
+  {
+   "id": "Task_StellungnahmeAnfordern",
+   "typ": "aufgabe",
+   "name": "Stellungnahme anfordern",
+   "rolle": "Rolle_Teamleitung",
+   "beschreibung": ""
+  },
+  {
+   "id": "Task_StellungnahmeAbgeben",
+   "typ": "aufgabe",
+   "name": "Stellungnahme abgeben",
+   "rolle": "Rolle_IT",
+   "beschreibung": ""
+  },
+  {
+   "id": "Task_Entscheiden",
+   "typ": "aufgabe",
+   "name": "Antrag entscheiden",
+   "rolle": "Rolle_Teamleitung",
+   "beschreibung": ""
+  },
+  {
+   "id": "Gateway_Entscheidung",
+   "typ": "xor",
+   "name": "",
+   "rolle": "Rolle_Teamleitung"
+  },
+  {
+   "id": "Gateway_AbgelehntEntscheidung",
+   "typ": "xor",
+   "name": "",
+   "rolle": "Rolle_Sachbearbeitung"
+  },
+  {
+   "id": "Task_AntragUeberarbeiten",
+   "typ": "aufgabe",
+   "name": "Antrag überarbeiten und erneut einreichen",
+   "rolle": "Rolle_Sachbearbeitung",
+   "beschreibung": ""
+  },
+  {
+   "id": "End_VorgangAbgebrochen",
+   "typ": "ende",
+   "art": "unbestimmt",
+   "name": "Vorgang ist abgebrochen",
+   "rolle": "Rolle_Sachbearbeitung"
+  },
+  {
+   "id": "Gateway_Betrag",
+   "typ": "xor",
+   "name": "",
+   "rolle": "Rolle_Teamleitung"
+  },
+  {
+   "id": "Task_DirektBestellen",
+   "typ": "aufgabe",
+   "name": "Direkt bestellen",
+   "rolle": "Rolle_Sachbearbeitung",
+   "beschreibung": ""
+  },
+  {
+   "id": "Zwischen_WareEingetroffen",
+   "typ": "zwischen",
+   "art": "nachricht",
+   "name": "Ware ist eingetroffen",
+   "rolle": "Rolle_Sachbearbeitung"
+  },
+  {
+   "id": "Task_WarePruefen",
+   "typ": "aufgabe",
+   "name": "Ware prüfen",
+   "rolle": "Rolle_Sachbearbeitung",
+   "beschreibung": ""
+  },
+  {
+   "id": "Gateway_WareOkay",
+   "typ": "xor",
+   "name": "",
+   "rolle": "Rolle_Sachbearbeitung"
+  },
+  {
+   "id": "Task_RechnungWeiterleiten",
+   "typ": "aufgabe",
+   "name": "Rechnung weiterleiten",
+   "rolle": "Rolle_Sachbearbeitung",
+   "beschreibung": ""
+  },
+  {
+   "id": "Task_RechnungBezahlen",
+   "typ": "aufgabe",
+   "name": "Rechnung prüfen und bezahlen",
+   "rolle": "Rolle_KaeMMerei",
+   "beschreibung": ""
+  },
+  {
+   "id": "End_ProzessAbgeschlossen",
+   "typ": "ende",
+   "art": "unbestimmt",
+   "name": "Prozess ist abgeschlossen",
+   "rolle": "Rolle_KaeMMerei"
+  },
+  {
+   "id": "Task_ReklamationDurchfuehren",
+   "typ": "aufgabe",
+   "name": "Reklamation durchführen",
+   "rolle": "Rolle_Sachbearbeitung",
+   "beschreibung": ""
+  },
+  {
+   "id": "End_ReklamationEingeleitet",
+   "typ": "ende",
+   "art": "unbestimmt",
+   "name": "Reklamation ist eingeleitet",
+   "rolle": "Rolle_Sachbearbeitung"
+  },
+  {
+   "id": "Gateway_ParallelStart",
+   "typ": "und",
+   "name": "",
+   "rolle": "Rolle_Vergabestelle"
+  },
+  {
+   "id": "Task_AngeboteEinholen",
+   "typ": "aufgabe",
+   "name": "Angebote einholen",
+   "rolle": "Rolle_Vergabestelle",
+   "beschreibung": ""
+  },
+  {
+   "id": "Task_HaushaltsmittelAnfragen",
+   "typ": "aufgabe",
+   "name": "Haushaltsmittel anfragen",
+   "rolle": "Rolle_Vergabestelle",
+   "beschreibung": ""
+  },
+  {
+   "id": "Gateway_Ereignis",
+   "typ": "ereignisgateway",
+   "name": "",
+   "rolle": "Rolle_Vergabestelle"
+  },
+  {
+   "id": "Zwischen_Mittelauskunft",
+   "typ": "zwischen",
+   "art": "nachricht",
+   "name": "Mittelauskunft ist eingegangen",
+   "rolle": "Rolle_Vergabestelle"
+  },
+  {
+   "id": "Task_MittelPruefen",
+   "typ": "aufgabe",
+   "name": "Mittel prüfen",
+   "rolle": "Rolle_Vergabestelle",
+   "beschreibung": ""
+  },
+  {
+   "id": "Gateway_MittelVorhanden",
+   "typ": "xor",
+   "name": "",
+   "rolle": "Rolle_Vergabestelle"
+  },
+  {
+   "id": "End_BeschaffungAbgelehnt",
+   "typ": "ende",
+   "art": "unbestimmt",
+   "name": "Beschaffung ist abgelehnt",
+   "rolle": "Rolle_Vergabestelle"
+  },
+  {
+   "id": "Zwischen_FristAbgelaufen",
+   "typ": "zwischen",
+   "art": "zeit",
+   "name": "Zwei Wochen Frist ist abgelaufen",
+   "rolle": "Rolle_Vergabestelle"
+  },
+  {
+   "id": "Task_ErinnerungSenden",
+   "typ": "aufgabe",
+   "name": "Erinnerung senden",
+   "rolle": "Rolle_Vergabestelle",
+   "beschreibung": ""
+  },
+  {
+   "id": "End_ErinnerungGesendet",
+   "typ": "ende",
+   "art": "unbestimmt",
+   "name": "Erinnerung ist gesendet",
+   "rolle": "Rolle_Vergabestelle"
+  },
+  {
+   "id": "Gateway_ParallelEnd",
+   "typ": "und",
+   "name": "",
+   "rolle": "Rolle_Vergabestelle"
+  },
+  {
+   "id": "Task_WirtschaftlichstesAngebotAuswaehlen",
+   "typ": "aufgabe",
+   "name": "Wirtschaftlichstes Angebot auswählen",
+   "rolle": "Rolle_Vergabestelle",
+   "beschreibung": ""
+  },
+  {
+   "id": "Task_AuftragErteilen",
+   "typ": "aufgabe",
+   "name": "Auftrag erteilen",
+   "rolle": "Rolle_Vergabestelle",
+   "beschreibung": ""
+  }
+ ],
+ "fluesse": [
+  {
+   "id": "Flow_1",
+   "von": "Start_BedarfErkannt",
+   "nach": "Task_AntragAusfuellen",
+   "name": ""
+  },
+  {
+   "id": "Flow_2",
+   "von": "Task_AntragAusfuellen",
+   "nach": "Task_AntragSichten",
+   "name": ""
+  },
+  {
+   "id": "Flow_3",
+   "von": "Task_AntragSichten",
+   "nach": "Gateway_ITRelevant",
+   "name": ""
+  },
+  {
+   "id": "Flow_4",
+   "von": "Gateway_ITRelevant",
+   "nach": "Task_StellungnahmeAnfordern",
+   "name": "ist IT-Sache"
+  },
+  {
+   "id": "Flow_5",
+   "von": "Gateway_ITRelevant",
+   "nach": "Task_Entscheiden",
+   "name": "keine IT-Sache"
+  },
+  {
+   "id": "Flow_6",
+   "von": "Task_StellungnahmeAnfordern",
+   "nach": "Task_StellungnahmeAbgeben",
+   "name": ""
+  },
+  {
+   "id": "Flow_7",
+   "von": "Task_StellungnahmeAbgeben",
+   "nach": "Task_Entscheiden",
+   "name": ""
+  },
+  {
+   "id": "Flow_8",
+   "von": "Task_Entscheiden",
+   "nach": "Gateway_Entscheidung",
+   "name": ""
+  },
+  {
+   "id": "Flow_9",
+   "von": "Gateway_Entscheidung",
+   "nach": "Gateway_AbgelehntEntscheidung",
+   "name": "abgelehnt"
+  },
+  {
+   "id": "Flow_10",
+   "von": "Gateway_AbgelehntEntscheidung",
+   "nach": "Task_AntragUeberarbeiten",
+   "name": "nachbessern"
+  },
+  {
+   "id": "Flow_11",
+   "von": "Gateway_AbgelehntEntscheidung",
+   "nach": "End_VorgangAbgebrochen",
+   "name": "abbrechen"
+  },
+  {
+   "id": "Flow_12",
+   "von": "Task_AntragUeberarbeiten",
+   "nach": "Task_AntragSichten",
+   "name": ""
+  },
+  {
+   "id": "Flow_13",
+   "von": "Gateway_Entscheidung",
+   "nach": "Gateway_Betrag",
+   "name": "genehmigt"
+  },
+  {
+   "id": "Flow_14",
+   "von": "Gateway_Betrag",
+   "nach": "Task_DirektBestellen",
+   "name": "unter 2.000 Euro"
+  },
+  {
+   "id": "Flow_15",
+   "von": "Gateway_Betrag",
+   "nach": "Gateway_ParallelStart",
+   "name": "2.000 Euro und mehr"
+  },
+  {
+   "id": "Flow_16",
+   "von": "Gateway_ParallelStart",
+   "nach": "Task_AngeboteEinholen",
+   "name": ""
+  },
+  {
+   "id": "Flow_17",
+   "von": "Gateway_ParallelStart",
+   "nach": "Task_HaushaltsmittelAnfragen",
+   "name": ""
+  },
+  {
+   "id": "Flow_18",
+   "von": "Task_HaushaltsmittelAnfragen",
+   "nach": "Gateway_Ereignis",
+   "name": ""
+  },
+  {
+   "id": "Flow_19",
+   "von": "Gateway_Ereignis",
+   "nach": "Zwischen_Mittelauskunft",
+   "name": "Mittelauskunft kommt"
+  },
+  {
+   "id": "Flow_20",
+   "von": "Gateway_Ereignis",
+   "nach": "Zwischen_FristAbgelaufen",
+   "name": "Frist verstreicht"
+  },
+  {
+   "id": "Flow_21",
+   "von": "Zwischen_Mittelauskunft",
+   "nach": "Task_MittelPruefen",
+   "name": ""
+  },
+  {
+   "id": "Flow_22",
+   "von": "Task_MittelPruefen",
+   "nach": "Gateway_MittelVorhanden",
+   "name": ""
+  },
+  {
+   "id": "Flow_23",
+   "von": "Gateway_MittelVorhanden",
+   "nach": "Gateway_ParallelEnd",
+   "name": "Mittel vorhanden"
+  },
+  {
+   "id": "Flow_24",
+   "von": "Gateway_MittelVorhanden",
+   "nach": "End_BeschaffungAbgelehnt",
+   "name": "keine Mittel"
+  },
+  {
+   "id": "Flow_25",
+   "von": "Zwischen_FristAbgelaufen",
+   "nach": "Task_ErinnerungSenden",
+   "name": ""
+  },
+  {
+   "id": "Flow_26",
+   "von": "Task_ErinnerungSenden",
+   "nach": "End_ErinnerungGesendet",
+   "name": ""
+  },
+  {
+   "id": "Flow_27",
+   "von": "Task_AngeboteEinholen",
+   "nach": "Gateway_ParallelEnd",
+   "name": ""
+  },
+  {
+   "id": "Flow_28",
+   "von": "Gateway_ParallelEnd",
+   "nach": "Task_WirtschaftlichstesAngebotAuswaehlen",
+   "name": ""
+  },
+  {
+   "id": "Flow_29",
+   "von": "Task_WirtschaftlichstesAngebotAuswaehlen",
+   "nach": "Task_AuftragErteilen",
+   "name": ""
+  },
+  {
+   "id": "Flow_30",
+   "von": "Task_DirektBestellen",
+   "nach": "Zwischen_WareEingetroffen",
+   "name": ""
+  },
+  {
+   "id": "Flow_31",
+   "von": "Task_AuftragErteilen",
+   "nach": "Zwischen_WareEingetroffen",
+   "name": ""
+  },
+  {
+   "id": "Flow_32",
+   "von": "Zwischen_WareEingetroffen",
+   "nach": "Task_WarePruefen",
+   "name": ""
+  },
+  {
+   "id": "Flow_33",
+   "von": "Task_WarePruefen",
+   "nach": "Gateway_WareOkay",
+   "name": ""
+  },
+  {
+   "id": "Flow_34",
+   "von": "Gateway_WareOkay",
+   "nach": "Task_RechnungWeiterleiten",
+   "name": "Ware ok"
+  },
+  {
+   "id": "Flow_35",
+   "von": "Gateway_WareOkay",
+   "nach": "Task_ReklamationDurchfuehren",
+   "name": "Ware defekt"
+  },
+  {
+   "id": "Flow_36",
+   "von": "Task_RechnungWeiterleiten",
+   "nach": "Task_RechnungBezahlen",
+   "name": ""
+  },
+  {
+   "id": "Flow_37",
+   "von": "Task_RechnungBezahlen",
+   "nach": "End_ProzessAbgeschlossen",
+   "name": ""
+  },
+  {
+   "id": "Flow_38",
+   "von": "Task_ReklamationDurchfuehren",
+   "nach": "End_ReklamationEingeleitet",
+   "name": ""
+  }
+ ],
+ "nachrichten": [
+  {
+   "id": "Msg_1",
+   "von": "Extern_Lieferant",
+   "nach": "Zwischen_WareEingetroffen",
+   "name": "Lieferung"
+  },
+  {
+   "id": "Msg_2",
+   "von": "Task_DirektBestellen",
+   "nach": "Extern_Lieferant",
+   "name": "Bestellung"
+  },
+  {
+   "id": "Msg_3",
+   "von": "Task_AuftragErteilen",
+   "nach": "Extern_Lieferant",
+   "name": "Auftrag"
+  },
+  {
+   "id": "Msg_4",
+   "von": "Task_ReklamationDurchfuehren",
+   "nach": "Extern_Lieferant",
+   "name": "Reklamation"
+  }
+ ],
+ "daten": [
+  {
+   "id": "Data_Beschaffungsantrag",
+   "typ": "datenobjekt",
+   "name": "Beschaffungsantrag [ausgefüllt]",
+   "rolle": "Rolle_Sachbearbeitung",
+   "lesen": [
+    "Task_AntragSichten",
+    "Task_Entscheiden",
+    "Task_AntragUeberarbeiten"
+   ],
+   "schreiben": [
+    "Task_AntragAusfuellen"
+   ]
+  }
+ ],
+ "unklarheiten": [
+  "Was passiert nach dem Senden einer Erinnerung an die Kämmerei? Endet der Prozess oder wird erneut gewartet?",
+  "Wer leitet die Rechnung an die Kämmerei weiter? (Sachbearbeitung oder Vergabestelle?)",
+  "Was passiert mit den parallel eingeholten Angeboten, wenn die Kämmerei keine Mittel freigibt? Werden sie verworfen?",
+  "Wird die IT-Stellungnahme auch nach einer Ablehnung bei erneuter Einreichung erneut eingeholt?",
+  "Gibt es eine Obergrenze für den Betrag, ab dem die Vergabestelle zuständig ist? (2000 Euro wurde genannt)"
+ ],
+ "nicht_modelliert": [
+  "Das Limit wurde letztes Jahr von 1.000 auf 2.000 Euro geändert.",
+  "Die Erinnerung an die Kämmerei wird nach zwei Wochen gesendet.",
+  "Es werden drei Angebote eingeholt."
+ ]
+}
