@@ -33,6 +33,8 @@ Build-Pack **Dockerfile**, Port **3000**, Domain `https://prozesspilot.wissen-un
 | `OPENROUTER_API_KEY` | ja | Schlüssel für OpenRouter |
 | `SESSION_SECRET` | empfohlen | lange Zeichenfolge; sonst nach jedem Neustart neu anmelden |
 | `MISTRAL_API_KEY` | nein | schaltet "Mistral Small (direkt bei Mistral, EU)" frei |
+| `MYRA_BASE_URL` | nein | Myra-Adresse mit Mandant und Gateway, z. B. `https://ai.myra.eu/v1/<mandant>/<gateway>/compat` |
+| `MYRA_API_KEY` | nein | Gateway-Token von Myra (`myra_…`); mit `MYRA_BASE_URL` erscheinen die Myra-Modelle |
 | `MODELS_JSON` | nein | eigene Modellliste, siehe `server/config.js` |
 
 ## Mehr

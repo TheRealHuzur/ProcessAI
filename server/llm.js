@@ -1,4 +1,4 @@
-// Anbindung an OpenAI-kompatible Chat-Schnittstellen (OpenRouter, Mistral).
+// Anbindung an OpenAI-kompatible Chat-Schnittstellen (OpenRouter, Mistral, Myra).
 import { PROVIDERS, config } from "./config.js";
 
 export class LlmError extends Error {}
@@ -14,6 +14,18 @@ function warte(ms) {
 function fehlertext(status, bodyText, model) {
   if (status === 429) {
     return `${model.label || model.id} ist beim Anbieter gerade ausgelastet. Bitte in ein bis zwei Minuten erneut versuchen oder ein anderes Modell wählen.`;
+  }
+  if (status === 403) {
+    // Myra meldet mit 403 auch Regeln des Gateways (Modell gesperrt, Datenresidenz, IP-Freigabe)
+    let fehler = null;
+    try {
+      fehler = JSON.parse(bodyText)?.error || null;
+    } catch {
+      fehler = null;
+    }
+    if (fehler?.code && fehler.code !== "forbidden" && fehler.code !== "unauthorized") {
+      return `Der KI-Anbieter lehnt die Anfrage ab (${fehler.code})${fehler.message ? `: ${fehler.message}` : ""}.`;
+    }
   }
   if (status === 401 || status === 403) {
     return "Der API-Schlüssel wurde abgelehnt. Bitte in Coolify prüfen.";
@@ -106,7 +118,9 @@ export async function chatCompletion({ model, messages, temperature = 0.1 }) {
 
 // Holt das erste JSON-Objekt aus einer Antwort, auch wenn es in ``` eingefasst ist.
 export function extractJson(text) {
-  const trimmed = String(text).trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "");
+  // Denkmodelle (z. B. Qwen) schreiben ihre Überlegungen teils als <think>…</think> vor die Antwort
+  const ohneDenken = String(text).replace(/<think>[\s\S]*?<\/think>/gi, "");
+  const trimmed = ohneDenken.trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/, "");
   try {
     return JSON.parse(trimmed);
   } catch {

@@ -21,15 +21,31 @@ export const PROVIDERS = {
     baseUrl: "https://api.mistral.ai/v1",
     apiKeyEnv: "MISTRAL_API_KEY",
     extraHeaders: {}
+  },
+  // Myra AI Workspace (Deutschland, BSI C5). Die Adresse enthält Mandant und Gateway:
+  // https://ai.myra.eu/v1/<mandant>/<gateway>/compat
+  myra: {
+    baseUrl: basisAdresse(process.env.MYRA_BASE_URL),
+    apiKeyEnv: "MYRA_API_KEY",
+    extraHeaders: {}
   }
 };
+
+// Akzeptiert die Basisadresse auch mit angehängtem /chat/completions oder Schrägstrich
+function basisAdresse(wert) {
+  return String(wert || "").trim().replace(/\/chat\/completions\/?$/, "").replace(/\/+$/, "");
+}
 
 // Modelle für das Auswahlfeld. Überschreibbar per MODELS_JSON (gleiche Struktur).
 const DEFAULT_MODELS = [
   { id: "deepseek/deepseek-v4-flash", label: "DeepSeek V4 Flash (sehr günstig)", provider: "openrouter" },
   { id: "mistralai/mistral-small-2603", label: "Mistral Small 4", provider: "openrouter" },
   // Direkt bei Mistral (EU). Erscheint nur, wenn MISTRAL_API_KEY gesetzt ist.
-  { id: "mistral/mistral-small-latest", apiModel: "mistral-small-latest", label: "Mistral Small (direkt bei Mistral, EU)", provider: "mistral" }
+  { id: "mistral/mistral-small-latest", apiModel: "mistral-small-latest", label: "Mistral Small (direkt bei Mistral, EU)", provider: "mistral" },
+  // Myra, Modelle auf Myras eigener Infrastruktur in der EU. Erscheinen nur mit MYRA_API_KEY und MYRA_BASE_URL.
+  { id: "myra/qwen3.8-27b", apiModel: "qwen3.8-27b", label: "Qwen 3.8 27B (Myra, EU)", provider: "myra" },
+  { id: "myra/mistral-small-4", apiModel: "mistral-small-4", label: "Mistral Small 4 (Myra, EU)", provider: "myra" },
+  { id: "myra/gemma-4-31b-it", apiModel: "gemma-4-31b-it", label: "Gemma 4 31B (Myra, EU)", provider: "myra" }
 ];
 
 function readModels() {
@@ -59,11 +75,11 @@ export const config = {
   maxTextLength: 30000
 };
 
-// Nur Modelle, für deren Anbieter ein API-Schlüssel hinterlegt ist
+// Nur Modelle, für deren Anbieter ein API-Schlüssel und eine Adresse hinterlegt sind
 export function verfuegbareModelle() {
   return config.models.filter((model) => {
     const provider = PROVIDERS[model.provider];
-    return provider && Boolean(process.env[provider.apiKeyEnv]);
+    return provider && Boolean(provider.baseUrl) && Boolean(process.env[provider.apiKeyEnv]);
   });
 }
 
