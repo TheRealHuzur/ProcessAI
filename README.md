@@ -2,46 +2,42 @@
 
 Prozess erzählen, Knopf drücken, BPMN-Modell bekommen. Arbeitstitel im Repo: ProcessAI.
 
-Erster Entwurf (Version 0.1):
+Version 0.1 kann:
 
 - Prozess einsprechen (Spracherkennung im Browser, Chrome) oder eintippen
-- KI erzeugt ein BPMN-2.0-Modell nach dem Regelwerk von Wissen & Werkzeug (`docs/bpmn-regelwerk.md`)
-- Automatischer Regelcheck, bei Regelverstößen eine Korrekturrunde durch die KI
-- Automatische Anordnung mit Pools und Schwimmbahnen
+- BPMN-2.0-Modell per KI erzeugen, nach dem Regelwerk in `docs/bpmn-regelwerk.md`
+- automatischer Regelcheck, bei Verstößen eine Korrekturrunde durch die KI
+- automatische Anordnung mit Pools und Schwimmbahnen
 - Bearbeiten im Editor (aus bpmndesk übernommen, Modi Easy, Basis, Vollständig)
-- Name und Beschreibung (Arbeitshilfe) je Element, gespeichert im BPMN-Feld `documentation`
-- Speichern mit Versionen in der Datenbank, Öffnen und Export als `.bpmn` und SVG
-- Einfacher Zugangsschutz per Passwort
-
-## Betrieb auf Coolify
-
-1. Neue Ressource aus diesem GitHub-Repo, Build-Pack **Dockerfile**.
-2. Domain: `https://prozesspilot.wissen-und-werkzeug.de`, Port **3000**.
-3. Umgebungsvariablen:
-
-| Variable | Pflicht | Bedeutung |
-|---|---|---|
-| `APP_PASSWORD` | ja | Passwort für die Anmeldung |
-| `OPENROUTER_API_KEY` | ja | Schlüssel für OpenRouter |
-| `SESSION_SECRET` | empfohlen | beliebige lange Zeichenfolge; sonst nach jedem Neustart neu anmelden |
-| `MISTRAL_API_KEY` | nein | schaltet zusätzlich "Mistral Small (direkt bei Mistral, EU)" frei, ohne Umweg über OpenRouter |
-| `MODELS_JSON` | nein | eigene Modellliste, siehe `server/config.js` |
-
-4. Persistenter Speicher: Volume auf **`/data`** einhängen. Dort liegt die Datenbank `prozesspilot.db`.
-5. Deployen.
+- Beschreibung (Arbeitshilfe) je Element im BPMN-Feld `documentation`
+- Speichern mit Versionen, Öffnen und Export als `.bpmn` und SVG
+- einfacher Zugangsschutz per Passwort
 
 ## Lokal
 
 ```bash
 npm install
-APP_PASSWORD=test OPENROUTER_API_KEY=... npm start
+cp .env.example .env   # Werte eintragen
+node --env-file=.env --no-warnings=ExperimentalWarning server/index.js
 # http://localhost:3000
 npm test
 ```
 
-## Aufbau
+## Betrieb auf Coolify
 
-Siehe `CLAUDE.md`, `docs/planung.md` und `docs/datenmodell.md`.
+Build-Pack **Dockerfile**, Port **3000**, Domain `https://prozesspilot.wissen-und-werkzeug.de`, Volume auf **`/data`** (Datenbank `prozesspilot.db`).
+
+| Variable | Pflicht | Bedeutung |
+|---|---|---|
+| `APP_PASSWORD` | ja | Passwort für die Anmeldung |
+| `OPENROUTER_API_KEY` | ja | Schlüssel für OpenRouter |
+| `SESSION_SECRET` | empfohlen | lange Zeichenfolge; sonst nach jedem Neustart neu anmelden |
+| `MISTRAL_API_KEY` | nein | schaltet "Mistral Small (direkt bei Mistral, EU)" frei |
+| `MODELS_JSON` | nein | eigene Modellliste, siehe `server/config.js` |
+
+## Mehr
+
+`CLAUDE.md` (Regeln und Aufbau), `docs/planung.md`, `docs/datenmodell.md`.
 
 ## Lizenz
 

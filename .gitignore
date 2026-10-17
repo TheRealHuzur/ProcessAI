@@ -1,6 +1,24 @@
+# Abhängigkeiten
 node_modules/
+
+# Lokale Daten und Datenbank
 data/
-.env
 *.db
 *.db-journal
+*.db-wal
+*.db-shm
+
+# Geheimnisse (Vorlage: .env.example)
+.env
+.env.*
+!.env.example
+
+# Logs und System
+*.log
+npm-debug.log*
 .DS_Store
+Thumbs.db
+
+# Editoren
+.vscode/
+.idea/
