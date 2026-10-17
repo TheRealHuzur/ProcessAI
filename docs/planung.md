@@ -1,6 +1,6 @@
 # ProzessPilot (Arbeitstitel, Repo heisst ProcessAI): Planungssammlung
 
-Stand: 17.10.2026 (übernommen aus der Planungssammlung vom 15.10.2026; ab jetzt ist diese Datei die führende Fassung)
+Stand: 17.10.2026 (übernommen aus der Planungssammlung vom 15.10.2026). Ideen- und Detailsammlung; Phasen und Fortschritt steuert der Masterplan (siehe `CLAUDE.md`).
 Status: Erster Entwurf 0.1 gebaut und am 14.10.2026 ins Repo ProcessAI (Branch main) gepusht. Seit 15.10.2026 live unter https://prozesspilot.wissen-und-werkzeug.de (Coolify, Dockerfile, Volume /data).
 Weitere Dokumente: `docs/bpmn-regelwerk.md` (wird zur Laufzeit in den Prompt geladen), `docs/datenmodell.md`.
 

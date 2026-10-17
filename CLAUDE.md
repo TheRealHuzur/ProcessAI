@@ -6,7 +6,7 @@ Prozess in normaler Sprache einsprechen oder eintippen, Knopf drücken, BPMN-2.0
 
 ## Harte Regeln
 
-- **Eigenständiges Projekt.** Keine Abhängigkeiten, Verweise, Pfade oder gemeinsame Konfiguration mit anderen Projekten auf dem Server. Alles, was ProzessPilot braucht, liegt in diesem Repo.
+- **Eigenständiges Projekt.** Keine Abhängigkeiten, Verweise, Pfade oder gemeinsame Konfiguration mit anderen Projekten auf dem Server. Alles, was ProzessPilot braucht, liegt in diesem Repo. Einzige Ausnahme ist der Masterplan im eigenen Storage-Ordner (siehe unten).
 - **bpmndesk (github.com/TheRealHuzur/bpmndesk) wird niemals verändert.** Keine Commits, keine Branches, keine Pull Requests, kein Verschieben dort. Erlaubt ist nur, daraus in dieses Repo zu kopieren.
 - **Nichts löschen ohne Rückfrage.**
 - **Einfach halten, kein Overengineering.** Wenig Abhängigkeiten, Vanilla JavaScript im Browser, Express im Backend, SQLite (eingebaut in Node) als Datenbank.
@@ -15,6 +15,13 @@ Prozess in normaler Sprache einsprechen oder eintippen, Knopf drücken, BPMN-2.0
 - **Nichts erfinden:** Die KI fügt keine Informationen hinzu und lässt keine weg. Unklares wird als Unklarheit ausgegeben.
 - **Über OpenRouter und die Browser-Spracherkennung nur Testprozesse**, keine echten Kundendaten.
 - Texte in der Oberfläche auf Deutsch, Alltagssprache, keine Gedankenstriche.
+
+## Masterplan
+
+- Führende Übersicht über Ziel, Phasen und Fortschritt: `/srv/wuw-storage/50_coding/prozesspilot/ProzessPilot-Masterplan.md` (außerhalb des Repos, Patrick liest ihn in Obsidian).
+- Vor größeren Arbeiten dort lesen, in welcher Phase wir stehen und was als Nächstes kommt.
+- Der Masterplan wird nicht ins Repo kopiert und nicht im Repo mitgepflegt. Keine Kopie und keine Schattenplanung in `docs/`.
+- `docs/planung.md` ist die Ideen- und Detailsammlung, der Masterplan steuert.
 
 ## Aufbau
 
@@ -29,7 +36,7 @@ Prozess in normaler Sprache einsprechen oder eintippen, Knopf drücken, BPMN-2.0
   - `config.js` alle Einstellungen und die Modellliste
   - `auth.js`, `db.js`, `modell.js` Anmeldung, Datenbank, Modellspeicher
 - `public/` Oberfläche; Editor-Module aus bpmndesk kopiert (`public/editor.js`), bpmn-js unter `public/vendor/`
-- `docs/` Planung (`planung.md`, führende Fassung), Regelwerk (`bpmn-regelwerk.md`, wird in den Prompt geladen), Datenmodell
+- `docs/` Ideen- und Detailplanung (`planung.md`), Regelwerk (`bpmn-regelwerk.md`, wird in den Prompt geladen), Datenmodell
 - `examples/` Beispielmodelle zum Vorführen
 - `test/` Tests mit `node --test`
 
@@ -45,7 +52,7 @@ Prozess in normaler Sprache einsprechen oder eintippen, Knopf drücken, BPMN-2.0
 
 - Erst lesen und prüfen, dann kleine, nachvollziehbare Änderungen.
 - Vor jedem Commit `npm test`.
-- Planung in `docs/planung.md` pflegen, wenn sich Entscheidungen ändern.
+- Neue Ideen und Detailentscheidungen in `docs/planung.md` festhalten.
 - Git-Aktionen (Commit, Push) nur nach Freigabe.
 - Abschluss knapp berichten: was geändert, wie geprüft, was offen ist.
 
