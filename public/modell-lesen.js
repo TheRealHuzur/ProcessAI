@@ -1,6 +1,7 @@
 // Liest das Modell aus dem Editor zurück in das JSON-Format der KI (siehe server/modell.js).
 // Grundlage für Änderungen per Sprachbefehl: Die KI bekommt immer den aktuellen Stand,
 // auch mit Änderungen von Hand. Läuft im Browser (bpmn-js) und in den Tests (bpmn-moddle).
+// Weitere Angaben am Schritt (Dokumente usw.) liest es über PPWissen aus wissen.js mit.
 (function (global) {
   "use strict";
 
@@ -125,14 +126,17 @@
       if (eigenerTyp === "teilprozess" && flussElementeVon(fe).length > 0) {
         abweichungen.push(`Der Inhalt des Teilprozesses "${name(fe) || fe.id}" geht verloren; der Teilprozess bleibt als ein Schritt.`);
       }
-      elemente.push({
+      const element = {
         id: fe.id,
         typ: eigenerTyp,
         art,
         name: name(fe),
         rolle: rolleVon.get(fe.id) || rollen[0].id,
         beschreibung: beschreibung(fe)
-      });
+      };
+      const wissen = global.PPWissen ? global.PPWissen.lesen(fe) : null;
+      if (wissen && !global.PPWissen.istLeer(wissen)) element.wissen = wissen;
+      elemente.push(element);
     }
 
     // Daten: Darstellungen desselben Datenobjekts bzw. Datenspeichers zusammenfassen

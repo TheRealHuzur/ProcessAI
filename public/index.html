@@ -44,6 +44,10 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="5" width="16" height="14" rx="2"></rect><circle cx="9" cy="10" r="1.5"></circle><path d="M20 15l-4.5-4.5L8 18"></path></svg>
           <span class="btn-label">SVG</span>
         </button>
+        <button class="btn btn-secondary" id="btn-handbuch" type="button" title="Handbuch mit den Arbeitshilfen als PDF">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h9a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"></path><path d="M5 17a3 3 0 0 1 3-3h9"></path></svg>
+          <span class="btn-label">Handbuch</span>
+        </button>
         <button class="btn btn-ghost" id="btn-abmelden" type="button" title="Abmelden">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4h4v16h-4"></path><path d="M10 8l-4 4 4 4"></path><path d="M6 12h10"></path></svg>
         </button>
@@ -152,6 +156,7 @@
             <input class="input" id="element-name" type="text" autocomplete="off">
             <label class="field-label" for="element-beschreibung">Beschreibung / Arbeitshilfe</label>
             <textarea class="input textarea textarea-klein" id="element-beschreibung" placeholder="Was mache ich in diesem Schritt eigentlich? Steht im BPMN-Beschreibungsfeld und reist beim Export mit."></textarea>
+            <div class="element-wissen" id="element-wissen" hidden></div>
             <p class="muted klein" id="element-id"></p>
           </aside>
         </div>
@@ -184,6 +189,7 @@
   <input id="file-input" type="file" accept=".bpmn,.xml" hidden>
 
   <script src="vendor/bpmn-js/bpmn-modeler.production.min.js"></script>
+  <script src="wissen.js"></script>
   <script src="editor.js"></script>
   <script src="spracherkennung.js"></script>
   <script src="modell-lesen.js"></script>

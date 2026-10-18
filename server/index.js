@@ -6,6 +6,7 @@ import { oeffneDatenbank } from "./db.js";
 import { anmelden, abmelden, istAngemeldet, nurAngemeldet } from "./auth.js";
 import { erzeugeModell, aendereModell } from "./pipeline.js";
 import { LlmError } from "./llm.js";
+import { erzeugeHandbuch, HandbuchFehler } from "./handbuch.js";
 
 export function erstelleApp({ db, llm } = {}) {
   const app = express();
@@ -87,6 +88,24 @@ export function erstelleApp({ db, llm } = {}) {
       console.error("Modelländerung fehlgeschlagen:", error);
       const status = error instanceof LlmError ? 502 : 500;
       return res.status(status).json({ fehler: error instanceof LlmError ? error.message : "Unerwarteter Fehler bei der Änderung." });
+    }
+  });
+
+  // Handbuch als PDF aus dem aktuellen Modell im Editor (auch ungespeichert)
+  app.post("/api/handbuch", async (req, res) => {
+    const body = req.body || {};
+    const bpmnXml = String(body.bpmnXml || "");
+    const version = Number.isInteger(body.version) && body.version > 0 ? body.version : null;
+    if (!bpmnXml.includes("definitions")) {
+      return res.status(400).json({ fehler: "Kein gültiges BPMN-XML übergeben." });
+    }
+    try {
+      const pdf = await erzeugeHandbuch(bpmnXml, { name: String(body.name || "").slice(0, 200), version });
+      return res.type("application/pdf").send(Buffer.from(pdf));
+    } catch (error) {
+      if (error instanceof HandbuchFehler) return res.status(400).json({ fehler: error.message });
+      console.error("Handbuch fehlgeschlagen:", error);
+      return res.status(500).json({ fehler: "Unerwarteter Fehler beim Erstellen des Handbuchs." });
     }
   });
 

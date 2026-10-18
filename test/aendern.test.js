@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import BpmnModdle from "bpmn-moddle";
 import { bauenAusJson, zuXml, aendereModell, vergleicheModelle } from "../server/pipeline.js";
 import { normalisiereModell } from "../server/modell.js";
+import { PPWissen } from "../server/wissen.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const lade = (...teile) => JSON.parse(fs.readFileSync(path.join(__dirname, ...teile), "utf8"));
@@ -16,13 +17,16 @@ const beschaffung = lade("fixtures", "beschaffung.json");
 
 // Das Browser-Skript wie im Browser laden
 const umgebung = {};
-vm.runInNewContext(fs.readFileSync(path.join(__dirname, "..", "public", "modell-lesen.js"), "utf8"), umgebung);
+vm.createContext(umgebung);
+for (const datei of ["wissen.js", "modell-lesen.js"]) {
+  vm.runInContext(fs.readFileSync(path.join(__dirname, "..", "public", datei), "utf8"), umgebung);
+}
 // Ergebnis über JSON in diesen Kontext holen (Arrays aus dem vm-Kontext sind sonst ein anderer Realm)
 const lesen = (definitions) => JSON.parse(JSON.stringify(umgebung.PPModellLesen.lesen(definitions)));
 
 async function zurueckgelesen(roh) {
   const { modell } = bauenAusJson(roh);
-  const { rootElement } = await new BpmnModdle().fromXML(zuXml(modell));
+  const { rootElement } = await new BpmnModdle({ pp: PPWissen.descriptor }).fromXML(zuXml(modell));
   const gelesen = lesen(rootElement);
   return { modell, gelesen };
 }
@@ -141,4 +145,37 @@ test("Änderung: unklare Anweisung liefert Rückfrage und kein geändertes Model
   const ergebnis = await aendereModell({ modellJson: beispiel, anweisung: "Mach das anders.", model: { id: "test" }, llm });
   assert.equal(ergebnis.aenderung.unveraendert, true);
   assert.equal(ergebnis.aenderung.rueckfrage, "Welcher Schritt ist gemeint?");
+});
+
+// Weitere Angaben am Schritt: pflegt nur der Mensch, gehen nie an die KI und überstehen jede Änderung
+const mitWissen = {
+  ...beispiel,
+  elemente: beispiel.elemente.map((e) => (e.id === "Task_BescheidErstellen"
+    ? { ...e, wissen: { dokumente: ["Bescheidvorlage <B12> & Anlage"], ansprechpersonen: ["Rechtsamt"], rechtsgrundlagen: ["§ 35 VwVfG"] } }
+    : e))
+};
+
+test("Weitere Angaben am Schritt reisen über das XML und werden zurückgelesen", async () => {
+  const { modell, gelesen } = await zurueckgelesen(mitWissen);
+  assert.deepEqual(modell.elemente.find((e) => e.id === "Task_BescheidErstellen").wissen, mitWissen.elemente.find((e) => e.id === "Task_BescheidErstellen").wissen);
+  const bescheid = gelesen.modell.elemente.find((e) => e.id === "Task_BescheidErstellen");
+  assert.deepEqual(bescheid.wissen, { dokumente: ["Bescheidvorlage <B12> & Anlage"], ansprechpersonen: ["Rechtsamt"], rechtsgrundlagen: ["§ 35 VwVfG"] });
+  assert.ok(!gelesen.modell.elemente.some((e) => e.id !== "Task_BescheidErstellen" && e.wissen), "leere Angaben fallen weg");
+});
+
+test("Änderung: weitere Angaben gehen nicht an die KI und bleiben erhalten", async () => {
+  let gesendet = "";
+  const llm = async ({ messages }) => {
+    gesendet = messages.map((m) => m.content).join("\n");
+    // Die KI liefert das Modell ohne Angaben zurück und erfindet an anderer Stelle welche
+    const neu = structuredClone(beispiel);
+    neu.elemente.find((e) => e.id === "Task_AntragErfassen").wissen = { dokumente: ["erfunden"] };
+    return { content: JSON.stringify(neu) };
+  };
+  const ergebnis = await aendereModell({ modellJson: mitWissen, anweisung: "Nichts ändern.", model: { id: "test" }, llm });
+  assert.ok(!gesendet.includes("Rechtsamt") && !gesendet.includes("VwVfG"));
+  const { rootElement } = await new BpmnModdle({ pp: PPWissen.descriptor }).fromXML(ergebnis.xml);
+  const elemente = lesen(rootElement).modell.elemente;
+  assert.deepEqual(elemente.find((e) => e.id === "Task_BescheidErstellen").wissen.rechtsgrundlagen, ["§ 35 VwVfG"]);
+  assert.equal(elemente.find((e) => e.id === "Task_AntragErfassen").wissen, undefined);
 });

@@ -1,5 +1,6 @@
 // Erzeugt BPMN-2.0-XML inklusive Diagramm-Informationen aus Modell und Anordnung.
 import { ELEMENT_TYPEN, DATEN_TYPEN } from "./modell.js";
+import { PPWissen } from "./wissen.js";
 
 const TAGS = {
   start: "startEvent",
@@ -69,7 +70,7 @@ export function erzeugeBpmnXml(modell, layout) {
   }
 
   push(`<?xml version="1.0" encoding="UTF-8"?>`);
-  push(`<bpmn:definitions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" id="Definitions_1" targetNamespace="https://prozesspilot.wissen-und-werkzeug.de/schema" exporter="ProzessPilot" exporterVersion="0.1.0">`);
+  push(`<bpmn:definitions xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:pp="${PPWissen.URI}" id="Definitions_1" targetNamespace="https://prozesspilot.wissen-und-werkzeug.de/schema" exporter="ProzessPilot" exporterVersion="0.1.0">`);
 
   // Kollaboration: eigener Pool, Black-Box-Pools, Nachrichtenflüsse
   push(`  <bpmn:collaboration id="Collaboration_1">`);
@@ -106,6 +107,13 @@ export function erzeugeBpmnXml(modell, layout) {
     push(`    <bpmn:${tag} id="${element.id}"${attrName(element.name)}>`);
     if (element.beschreibung) {
       push(`      <bpmn:documentation>${esc(element.beschreibung)}</bpmn:documentation>`);
+    }
+    if (element.wissen && !PPWissen.istLeer(element.wissen)) {
+      push(`      <bpmn:extensionElements><pp:wissen>`);
+      for (const f of PPWissen.FELDER) {
+        for (const eintrag of element.wissen[f.key] || []) push(`        <pp:${f.tag}>${esc(eintrag)}</pp:${f.tag}>`);
+      }
+      push(`      </pp:wissen></bpmn:extensionElements>`);
     }
     for (const id of eingehend.get(element.id)) push(`      <bpmn:incoming>${id}</bpmn:incoming>`);
     for (const id of ausgehend.get(element.id)) push(`      <bpmn:outgoing>${id}</bpmn:outgoing>`);

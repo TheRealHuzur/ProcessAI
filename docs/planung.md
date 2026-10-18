@@ -66,9 +66,9 @@ Danach in Version 1: Rückfragen der KI im Dialog, Sprachbefehle im Editor.
 ### Schritt 2: Wissensmanagement
 
 **Version 1**
-- Arbeitshilfe pro Prozessschritt als Prosatext im BPMN-Beschreibungsfeld
-- Handbuch-Export als PDF, auch zum Ausdrucken; für Einarbeitung, Rechnungsprüfung und Nachschlagen
-- Fragen als Signal: Jede Frage an den Chatbot, die nicht beantwortet werden kann, landet sofort auf einer Liste (Wissenslücke)
+- Arbeitshilfe pro Prozessschritt als Prosatext im BPMN-Beschreibungsfeld, dazu Dokumente, Ansprechpersonen (Rollen) und Rechtsgrundlagen (gebaut 18.10.2026, von Menschen gepflegt)
+- Handbuch-Export als PDF, auch zum Ausdrucken; für Einarbeitung, Rechnungsprüfung und Nachschlagen (gebaut 18.10.2026, Aufbau siehe unten)
+- ~~Fragen als Signal~~ verschoben zum Chatbot (18.10.2026): Jede Frage an den Chatbot, die nicht beantwortet werden kann, landet sofort auf einer Liste (Wissenslücke). Hängt am Chatbot und ist damit eine KI-Funktion; in Version 1 keine weiteren KI-Funktionen
 
 **Gesetzt, Version noch offen**
 - Wissen gemeinsam pflegen: Kolleginnen und Kollegen kommentieren, ergänzen oder schlagen Ergänzungen vor; eine Rolle kuratiert, gibt frei und strukturiert; wachsendes, lebendes Konstrukt
@@ -170,6 +170,22 @@ Am Prozess bzw. am Prozessschritt hängen:
 
 - Die Arbeitshilfe liegt zunächst im standardisierten BPMN-Feld `documentation` (Beschreibung) des jeweiligen Elements.
 - Grund: Austausch mit anderen Prozessmanagement-Tools. Was dort im Beschreibungsfeld steht, wird beim Import hier übernommen und umgekehrt.
+
+### Weitere Angaben am Schritt (gebaut 18.10.2026)
+
+- Dokumente und Vorlagen, Ansprechpersonen (Rollen, keine Namen), Rechtsgrundlagen; je Feld eine Angabe pro Zeile. Adressen (https://…) werden im Handbuch zu Links.
+- Nur an Aktivitäten (Aufgaben und Teilprozesse). Pflege durch Menschen im Seitenfeld des Editors; die KI bekommt die Angaben nicht und übernimmt sie bei Änderungen über die id.
+- Gespeichert als eigene BPMN-Erweiterung im Element (`<bpmn:extensionElements><pp:wissen>…`), damit sie mit der `.bpmn`-Datei und jeder Version reisen. Andere Werkzeuge ignorieren die Erweiterung in der Regel, die Arbeitshilfe im Beschreibungsfeld sehen sie weiterhin.
+- Im Diagramm zeigt ein kleines Buch-Symbol unten rechts an Aktivitäten, dass Arbeitshilfe oder weitere Angaben hinterlegt sind; Klick öffnet sie.
+
+### Handbuch (gebaut 18.10.2026)
+
+- Aufbau: Deckblatt (Prozessname, Beschreibung des Pools, Stand, Version), Inhaltsverzeichnis mit Seitenzahlen, ein Kapitel je Schwimmbahn.
+- Logik des Wissensmanagements: Jede Person will für ihre Schwimmbahn wissen, was zu tun ist.
+- Gliederung: Schwimmbahn > Teilprozess > Aktivitäten. Aufgaben direkt in der Bahn stehen auf derselben Ebene wie Teilprozesse. Teilprozesse ohne Aktivitäten erscheinen mit ihrer eigenen Beschreibung. Reihenfolge nach Lage im Diagramm (links nach rechts).
+- Aktivitäten ohne Arbeitshilfe stehen mit dem Hinweis „Noch keine Arbeitshilfe hinterlegt.“ im Handbuch, damit Lücken sichtbar werden.
+- Erzeugt wird aus dem aktuellen Stand im Editor, auch ungespeichert; die Version steht nur auf dem Deckblatt, wenn der Stand gespeichert ist.
+- Offen: Gehören Ereignisse oder Entscheidungen (Gateways) mit Beschreibung ins Handbuch? Soll eine Prozessübersicht (Diagramm) hinein? Teilprozesse mit eigenen Schwimmbahnen im Inneren werden vorerst unter der Bahn des Teilprozesses geführt.
 
 ## KI-Anbindung
 
@@ -286,3 +302,4 @@ Gib das Ergebnis als PNG und als BPMN Datei aus.
 - Regelwerk verfeinern und für die KI aufbereiten (Rohfassung liegt vor)
 - Wahl des KI-Modells und Anbieters
 - Version für: gemeinsames Pflegen, Chatbot, Checkliste, Teilen per Link, Wissenslücken-Radar
+- Wissenslücken ohne KI: Offene Fragen am Schritt, die Menschen selbst eintragen (statt nur unbeantwortete Chatbot-Fragen)? Idee vom 18.10.2026, nicht entschieden

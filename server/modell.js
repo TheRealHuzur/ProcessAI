@@ -6,13 +6,17 @@
 //   "rollen":   [{ "id": "Rolle_Sachbearbeitung", "name": "Sachbearbeitung" }],
 //   "externe":  [{ "id": "Extern_Antragstellende", "name": "Antragstellende" }],
 //   "elemente": [{ "id": "Task_AntragPruefen", "typ": "aufgabe", "art": "", "name": "Antrag prüfen",
-//                  "rolle": "Rolle_Sachbearbeitung", "beschreibung": "" }],
+//                  "rolle": "Rolle_Sachbearbeitung", "beschreibung": "",
+//                  "wissen": { "dokumente": [], "ansprechpersonen": [], "rechtsgrundlagen": [] } }],
+//                 (wissen nur, wenn ein Mensch Angaben gepflegt hat; die KI bekommt und liefert es nie)
 //   "fluesse":  [{ "id": "Flow_1", "von": "Start_AntragEingegangen", "nach": "Task_AntragPruefen", "name": "" }],
 //   "nachrichten": [{ "id": "Msg_1", "von": "Extern_Antragstellende", "nach": "Start_AntragEingegangen", "name": "Antrag" }],
 //   "daten":    [{ "id": "Data_Antrag", "typ": "datenobjekt", "name": "Antrag [eingegangen]",
 //                  "rolle": "Rolle_Sachbearbeitung", "lesen": ["Task_AntragPruefen"], "schreiben": [] }],
 //   "unklarheiten": ["..."]
 // }
+
+import { PPWissen } from "./wissen.js";
 
 export const ELEMENT_TYPEN = {
   start: { bpmn: "bpmn:StartEvent", prefix: "Start", arten: ["unbestimmt", "nachricht", "zeit", "bedingt"] },
@@ -63,6 +67,13 @@ function key(value) {
 
 function asArray(value) {
   return Array.isArray(value) ? value : [];
+}
+
+// Weitere Angaben am Schritt (Dokumente, Ansprechpersonen, Rechtsgrundlagen); leer heißt: Feld weglassen
+function wissenAus(roh) {
+  if (!roh || typeof roh !== "object") return {};
+  const wissen = Object.fromEntries(PPWissen.FELDER.map((f) => [f.key, asArray(roh[f.key]).map(text).filter(Boolean)]));
+  return PPWissen.istLeer(wissen) ? {} : { wissen };
 }
 
 // Erzeugt gültige, eindeutige XML-IDs und merkt sich die Zuordnung alt -> neu.
@@ -172,7 +183,8 @@ export function normalisiereModell(roh) {
       art,
       name: text(element?.name),
       rolle,
-      beschreibung: text(element?.beschreibung)
+      beschreibung: text(element?.beschreibung),
+      ...wissenAus(element?.wissen)
     });
   }
 

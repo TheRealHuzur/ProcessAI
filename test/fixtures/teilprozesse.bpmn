@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Testmodell für das Handbuch: zwei Schwimmbahnen, ein Teilprozess mit Aktivitäten (eigene Ebene im Diagramm),
+     ein Teilprozess ohne Aktivitäten mit Beschreibung, weitere Angaben in pp:wissen -->
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:pp="https://prozesspilot.wissen-und-werkzeug.de/schema/wissen" id="Definitions_1" targetNamespace="https://prozesspilot.wissen-und-werkzeug.de/schema">
+  <bpmn:collaboration id="Collaboration_1">
+    <bpmn:participant id="Participant_Main" name="Stadtkasse" processRef="Process_1">
+      <bpmn:documentation>Wie eine Rechnung bezahlt wird.</bpmn:documentation>
+    </bpmn:participant>
+  </bpmn:collaboration>
+  <bpmn:process id="Process_1" name="Rechnung bezahlen" isExecutable="false">
+    <bpmn:laneSet id="LaneSet_1">
+      <bpmn:lane id="Rolle_Sachbearbeitung" name="Sachbearbeitung">
+        <bpmn:flowNodeRef>Start_1</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Sub_Zahlung</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>Task_Pruefen</bpmn:flowNodeRef>
+        <bpmn:flowNodeRef>End_1</bpmn:flowNodeRef>
+      </bpmn:lane>
+      <bpmn:lane id="Rolle_Kassenleitung" name="Kassenleitung">
+        <bpmn:flowNodeRef>Sub_Freigabe</bpmn:flowNodeRef>
+      </bpmn:lane>
+    </bpmn:laneSet>
+    <bpmn:startEvent id="Start_1" name="Rechnung ist eingegangen" />
+    <!-- Absichtlich vor Task_Pruefen notiert: die Reihenfolge im Handbuch folgt der Lage im Diagramm -->
+    <bpmn:subProcess id="Sub_Zahlung" name="Zahlung&#10;ausführen">
+      <bpmn:startEvent id="Sub_Start" />
+      <bpmn:task id="Task_Anweisen" name="Zahlung anweisen" />
+      <bpmn:task id="Task_Buchen" name="Rechnung buchen">
+        <bpmn:documentation>Im Fachverfahren buchen.
+
+Belegnummer auf der Rechnung vermerken.</bpmn:documentation>
+      </bpmn:task>
+      <bpmn:endEvent id="Sub_Ende" />
+      <bpmn:sequenceFlow id="SF_1" sourceRef="Sub_Start" targetRef="Task_Buchen" />
+      <bpmn:sequenceFlow id="SF_2" sourceRef="Task_Buchen" targetRef="Task_Anweisen" />
+      <bpmn:sequenceFlow id="SF_3" sourceRef="Task_Anweisen" targetRef="Sub_Ende" />
+    </bpmn:subProcess>
+    <bpmn:task id="Task_Pruefen" name="Rechnung prüfen">
+      <bpmn:documentation>Sachlich und rechnerisch richtig zeichnen.</bpmn:documentation>
+      <bpmn:extensionElements>
+        <pp:wissen>
+          <pp:dokument>Prüfvermerk, Vorlage V3</pp:dokument>
+          <pp:dokument>Dienstanweisung https://example.org/da-kasse</pp:dokument>
+          <pp:ansprechperson>Kassenleitung</pp:ansprechperson>
+          <pp:rechtsgrundlage>§ 33 GemHVO</pp:rechtsgrundlage>
+        </pp:wissen>
+      </bpmn:extensionElements>
+    </bpmn:task>
+    <bpmn:subProcess id="Sub_Freigabe" name="Zahlung freigeben">
+      <bpmn:documentation>Ab 5.000 Euro zeichnet die Kassenleitung mit.</bpmn:documentation>
+    </bpmn:subProcess>
+    <bpmn:endEvent id="End_1" name="Rechnung ist bezahlt" />
+    <bpmn:sequenceFlow id="Flow_1" sourceRef="Start_1" targetRef="Task_Pruefen" />
+    <bpmn:sequenceFlow id="Flow_2" sourceRef="Task_Pruefen" targetRef="Sub_Freigabe" />
+    <bpmn:sequenceFlow id="Flow_3" sourceRef="Sub_Freigabe" targetRef="Sub_Zahlung" />
+    <bpmn:sequenceFlow id="Flow_4" sourceRef="Sub_Zahlung" targetRef="End_1" />
+  </bpmn:process>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_1">
+    <bpmndi:BPMNPlane id="BPMNPlane_1" bpmnElement="Collaboration_1">
+      <bpmndi:BPMNShape id="Participant_Main_di" bpmnElement="Participant_Main" isHorizontal="true"><dc:Bounds x="100" y="80" width="760" height="300" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Rolle_Sachbearbeitung_di" bpmnElement="Rolle_Sachbearbeitung" isHorizontal="true"><dc:Bounds x="130" y="80" width="730" height="150" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Rolle_Kassenleitung_di" bpmnElement="Rolle_Kassenleitung" isHorizontal="true"><dc:Bounds x="130" y="230" width="730" height="150" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Start_1_di" bpmnElement="Start_1"><dc:Bounds x="172" y="137" width="36" height="36" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Pruefen_di" bpmnElement="Task_Pruefen"><dc:Bounds x="250" y="115" width="100" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Sub_Freigabe_di" bpmnElement="Sub_Freigabe" isExpanded="false"><dc:Bounds x="400" y="265" width="100" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Sub_Zahlung_di" bpmnElement="Sub_Zahlung" isExpanded="false"><dc:Bounds x="550" y="115" width="100" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="End_1_di" bpmnElement="End_1"><dc:Bounds x="712" y="137" width="36" height="36" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="Flow_1_di" bpmnElement="Flow_1"><di:waypoint x="208" y="155" /><di:waypoint x="250" y="155" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_2_di" bpmnElement="Flow_2"><di:waypoint x="350" y="155" /><di:waypoint x="375" y="155" /><di:waypoint x="375" y="305" /><di:waypoint x="400" y="305" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_3_di" bpmnElement="Flow_3"><di:waypoint x="500" y="305" /><di:waypoint x="525" y="305" /><di:waypoint x="525" y="155" /><di:waypoint x="550" y="155" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="Flow_4_di" bpmnElement="Flow_4"><di:waypoint x="650" y="155" /><di:waypoint x="712" y="155" /></bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+  <bpmndi:BPMNDiagram id="BPMNDiagram_Sub_Zahlung">
+    <bpmndi:BPMNPlane id="BPMNPlane_Sub_Zahlung" bpmnElement="Sub_Zahlung">
+      <bpmndi:BPMNShape id="Sub_Start_di" bpmnElement="Sub_Start"><dc:Bounds x="100" y="100" width="36" height="36" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Buchen_di" bpmnElement="Task_Buchen"><dc:Bounds x="180" y="78" width="100" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Task_Anweisen_di" bpmnElement="Task_Anweisen"><dc:Bounds x="330" y="78" width="100" height="80" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="Sub_Ende_di" bpmnElement="Sub_Ende"><dc:Bounds x="480" y="100" width="36" height="36" /></bpmndi:BPMNShape>
+      <bpmndi:BPMNEdge id="SF_1_di" bpmnElement="SF_1"><di:waypoint x="136" y="118" /><di:waypoint x="180" y="118" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="SF_2_di" bpmnElement="SF_2"><di:waypoint x="280" y="118" /><di:waypoint x="330" y="118" /></bpmndi:BPMNEdge>
+      <bpmndi:BPMNEdge id="SF_3_di" bpmnElement="SF_3"><di:waypoint x="430" y="118" /><di:waypoint x="480" y="118" /></bpmndi:BPMNEdge>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn:definitions>

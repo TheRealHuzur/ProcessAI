@@ -29,6 +29,7 @@
     elementTyp: $("element-typ"),
     elementName: $("element-name"),
     elementBeschreibung: $("element-beschreibung"),
+    elementWissen: $("element-wissen"),
     elementId: $("element-id"),
     dialogProzesse: $("dialog-prozesse"),
     prozessListe: $("prozess-liste"),
@@ -83,6 +84,8 @@
     modeler: null,
     mode: "basis",
     prozessId: null,
+    // Gespeicherte Version, für das Deckblatt des Handbuchs
+    version: null,
     letzteErzeugung: null,
     dirty: false,
     markierungen: [],
@@ -252,7 +255,9 @@
     eventBus.on("commandStack.changed", () => {
       setDirty(true);
       verbergeLeerHinweis();
+      aktualisiereWissenMarker();
     });
+    eventBus.on("import.done", () => aktualisiereWissenMarker());
     eventBus.on("selection.changed", ({ newSelection }) => {
       zeigeElementPanel(newSelection.length === 1 ? newSelection[0] : null);
     });
@@ -394,6 +399,30 @@
     aktualisiereBezug();
   }
 
+  // Weitere Angaben (Dokumente, Ansprechpersonen, Rechtsgrundlagen) nur an Aktivitäten
+  function istAktivitaet(element) {
+    const bo = element && element.businessObject;
+    return Boolean(bo && bo.$instanceOf && bo.$instanceOf("bpmn:Activity"));
+  }
+
+  function baueWissenFelder() {
+    el.wissenFelder = {};
+    for (const f of window.PPWissen.FELDER) {
+      const label = document.createElement("label");
+      label.className = "field-label";
+      label.htmlFor = `element-wissen-${f.key}`;
+      label.textContent = f.titel;
+      const feld = document.createElement("textarea");
+      feld.className = "input textarea textarea-wissen";
+      feld.id = `element-wissen-${f.key}`;
+      feld.rows = 2;
+      feld.placeholder = f.key === "ansprechpersonen" ? "Eine Rolle je Zeile, kein Name" : "Eine Angabe je Zeile";
+      feld.addEventListener("input", uebernehmeWissen);
+      el.elementWissen.append(label, feld);
+      el.wissenFelder[f.key] = feld;
+    }
+  }
+
   function fuellePanel(element, { nurWennNichtFokussiert }) {
     const bo = element.businessObject;
     el.elementTyp.textContent = TYP_NAMEN[bo.$type] || bo.$type.replace("bpmn:", "");
@@ -403,6 +432,15 @@
     }
     if (!(nurWennNichtFokussiert && document.activeElement === el.elementBeschreibung)) {
       el.elementBeschreibung.value = (bo.documentation || []).map((d) => d.text || "").join("\n\n");
+    }
+    el.elementWissen.hidden = !istAktivitaet(element);
+    if (!el.elementWissen.hidden) {
+      const wissen = window.PPWissen.lesen(bo);
+      for (const f of window.PPWissen.FELDER) {
+        const feld = el.wissenFelder[f.key];
+        if (nurWennNichtFokussiert && document.activeElement === feld) continue;
+        feld.value = wissen[f.key].join("\n");
+      }
     }
   }
 
@@ -424,6 +462,44 @@
     const documentation = text.trim() ? [moddle.create("bpmn:Documentation", { text })] : [];
     state.modeler.get("modeling").updateProperties(element, { documentation });
   }, 450);
+
+  const uebernehmeWissen = debounce(() => {
+    const element = state.ausgewaehlt;
+    if (!element || !istAktivitaet(element)) return;
+    const { PPWissen } = window;
+    const bo = element.businessObject;
+    const neu = Object.fromEntries(PPWissen.FELDER.map((f) => [f.key, PPWissen.zeilen(el.wissenFelder[f.key].value)]));
+    if (JSON.stringify(neu) === JSON.stringify(PPWissen.lesen(bo))) return;
+    const extensionElements = PPWissen.alsExtensionElements(state.modeler.get("moddle"), bo, neu);
+    state.modeler.get("modeling").updateProperties(element, { extensionElements });
+  }, 450);
+
+  // Kleines Buch-Symbol an jeder Aktivität mit Arbeitshilfe oder weiteren Angaben; Klick öffnet sie
+  function hatWissen(bo) {
+    const arbeitshilfe = (bo.documentation || []).some((d) => (d.text || "").trim());
+    return arbeitshilfe || !window.PPWissen.istLeer(window.PPWissen.lesen(bo));
+  }
+
+  const aktualisiereWissenMarker = debounce(() => {
+    if (!state.modeler) return;
+    const overlays = state.modeler.get("overlays");
+    overlays.remove({ type: "pp-wissen" });
+    for (const element of state.modeler.get("elementRegistry").getAll()) {
+      // Ohne parent: Ebene eines aufgeklappten Teilprozesses, kein Symbol im Diagramm
+      if (!element.parent || element.labelTarget || !istAktivitaet(element) || !hatWissen(element.businessObject)) continue;
+      const marker = document.createElement("button");
+      marker.type = "button";
+      marker.className = "pp-wissen-marker";
+      marker.title = "Arbeitshilfe ansehen";
+      marker.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h9a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"></path><path d="M5 17a3 3 0 0 1 3-3h9"></path></svg>';
+      marker.addEventListener("click", (event) => {
+        event.stopPropagation();
+        state.modeler.get("selection").select(element);
+        el.elementBeschreibung.focus();
+      });
+      overlays.add(element, "pp-wissen", { position: { bottom: 20, right: 22 }, html: marker });
+    }
+  }, 150);
 
   // ---------- Ergebnis anzeigen ----------
 
@@ -711,6 +787,7 @@
       };
       const ergebnis = await api("/api/prozesse", { method: "POST", body });
       state.prozessId = ergebnis.id;
+      state.version = ergebnis.version;
       state.letzteErzeugung = null;
       state.befehle = [];
       speicherSchreiben("pp.prozessId", ergebnis.id);
@@ -730,6 +807,7 @@
       verlaufLeeren();
       state.fragen = fragenAusKiJson(prozess.aktuell.ki_json);
       state.prozessId = prozess.id;
+      state.version = prozess.aktuell.version;
       state.letzteErzeugung = null;
       if (!felderBehalten) {
         el.prozessname.value = prozess.name;
@@ -864,6 +942,29 @@
       download(await aktuellesXml(), "application/xml;charset=utf-8", dateiname("bpmn"));
     } catch (error) {
       toast("Export fehlgeschlagen.", "error");
+    }
+  }
+
+  async function exportHandbuch() {
+    try {
+      const res = await fetch("/api/handbuch", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "same-origin",
+        body: JSON.stringify({
+          bpmnXml: await aktuellesXml(),
+          name: el.prozessname.value.trim(),
+          version: state.prozessId && !state.dirty ? state.version : null
+        })
+      });
+      if (res.status === 401) return zeigeLogin();
+      if (!res.ok) {
+        const daten = await res.json().catch(() => null);
+        throw new Error((daten && daten.fehler) || `Fehler ${res.status}`);
+      }
+      download(await res.blob(), "application/pdf", dateiname("pdf").replace(/\.pdf$/, "-handbuch.pdf"));
+    } catch (error) {
+      toast(`Handbuch konnte nicht erstellt werden: ${error.message}`, "error");
     }
   }
 
@@ -1060,6 +1161,7 @@
     // Vor dem ersten Import lesen, der Import selbst setzt den Änderungsstatus zurück
     const modellEntwurf = modellEntwurfLesen();
     baueModeButtons();
+    baueWissenFelder();
     await erstelleModeler(state.mode, LEER_XML);
     setDirty(false);
     entwurfLaden();
@@ -1085,6 +1187,7 @@
     $("btn-oeffnen").addEventListener("click", oeffneDatei);
     $("btn-export").addEventListener("click", exportBpmn);
     $("btn-svg").addEventListener("click", exportSvg);
+    $("btn-handbuch").addEventListener("click", exportHandbuch);
     $("btn-selbst-zeichnen").addEventListener("click", verbergeLeerHinweis);
     $("btn-element-schliessen").addEventListener("click", () => state.modeler.get("selection").select([]));
     el.befehlAusfuehren.addEventListener("click", befehlAusfuehren);

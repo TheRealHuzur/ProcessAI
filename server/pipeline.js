@@ -139,8 +139,8 @@ export async function erzeugeModell({ text, prozessname, model, llm = chatComple
   return antwortAusErgebnis(await kiMitRegelcheck({ messages, model, llm }));
 }
 
-// Die Beschreibungen (Arbeitshilfen) gehen nicht an die KI. Sie werden über die id übernommen,
-// bei geänderter id über Name und Typ, wenn das eindeutig ist.
+// Die Beschreibungen (Arbeitshilfen) und weiteren Angaben gehen nicht an die KI. Sie werden über die id
+// übernommen, bei geänderter id über Name und Typ, wenn das eindeutig ist. Wissen pflegt nur der Mensch.
 export function uebernehmeBeschreibungen(alt, neu) {
   const altById = new Map(alt.elemente.map((e) => [e.id, e]));
   for (const element of neu.elemente) {
@@ -150,6 +150,8 @@ export function uebernehmeBeschreibungen(alt, neu) {
       if (kandidaten.length === 1) quelle = kandidaten[0];
     }
     if (quelle && quelle.beschreibung) element.beschreibung = quelle.beschreibung;
+    if (quelle && quelle.wissen) element.wissen = quelle.wissen;
+    else delete element.wissen;
   }
 }
 
@@ -185,7 +187,7 @@ export function vergleicheModelle(alt, neu) {
 }
 
 function ohneBeschreibungen(roh) {
-  return { ...roh, elemente: (Array.isArray(roh.elemente) ? roh.elemente : []).map(({ beschreibung, ...rest }) => rest) };
+  return { ...roh, elemente: (Array.isArray(roh.elemente) ? roh.elemente : []).map(({ beschreibung, wissen, ...rest }) => rest) };
 }
 
 // Sprachbefehl oder Antwort auf eine Frage: bestehendes Modell (JSON aus dem Editor) gezielt ändern

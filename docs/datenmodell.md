@@ -5,6 +5,7 @@ Datenbank: SQLite (in Node eingebaut, `node:sqlite`), Datei unter `DATA_DIR` (St
 ## Grundprinzip
 
 - Das BPMN-Modell wird als XML gespeichert. Die Arbeitshilfen stehen im BPMN-Feld `documentation` und reisen damit beim Export mit.
+- Weitere Angaben an Aktivitäten (Dokumente, Ansprechpersonen, Rechtsgrundlagen) stehen ebenfalls im XML, als Erweiterung im Element (siehe unten). Dafür gibt es keine eigene Tabelle.
 - Jedes BPMN-Element hat eine feste ID (z. B. `Task_AntragPruefen`). Spätere Tabellen hängen über `element_id` an einem Prozessschritt.
 - Jede Speicherung erzeugt eine neue Version. Nichts wird überschrieben.
 
@@ -34,6 +35,25 @@ Datenbank: SQLite (in Node eingebaut, `node:sqlite`), Datei unter `DATA_DIR` (St
 | notiz | TEXT | optional |
 | erstellt | TEXT | ISO-Zeitstempel |
 
+### Weitere Angaben am Schritt (im BPMN-XML)
+
+Namensraum `pp` = `https://prozesspilot.wissen-und-werkzeug.de/schema/wissen`, Beschreibung in `public/wissen.js` (gilt für Editor und Server).
+
+```xml
+<bpmn:task id="Task_RechnungPruefen" name="Rechnung prüfen">
+  <bpmn:documentation>Arbeitshilfe als Fließtext</bpmn:documentation>
+  <bpmn:extensionElements>
+    <pp:wissen>
+      <pp:dokument>Prüfvermerk, Vorlage V3</pp:dokument>
+      <pp:ansprechperson>Kassenleitung</pp:ansprechperson>
+      <pp:rechtsgrundlage>§ 33 GemHVO</pp:rechtsgrundlage>
+    </pp:wissen>
+  </bpmn:extensionElements>
+</bpmn:task>
+```
+
+Im KI-JSON heißt das Feld `wissen` (`dokumente`, `ansprechpersonen`, `rechtsgrundlagen`, je eine Liste). Es geht nie an die KI und wird bei Änderungen über die id übernommen.
+
 ## Vorgesehen für Version 2 und 3 (noch nicht angelegt)
 
 Alle hängen über `prozess_id` und, wo sinnvoll, `element_id` am Prozess.
@@ -41,7 +61,7 @@ Alle hängen über `prozess_id` und, wo sinnvoll, `element_id` am Prozess.
 | Tabelle | Zweck |
 |---|---|
 | kommentare | Kommentare und Ergänzungsvorschläge am Schritt, mit Status (offen, freigegeben, abgelehnt) und kuratierender Rolle |
-| fragen | Fragen an den Chatbot, die nicht beantwortet werden konnten (Wissenslücken) |
+| fragen | Fragen an den Chatbot, die nicht beantwortet werden konnten (Wissenslücken); kommt mit dem Chatbot (aus Version 1 verschoben am 18.10.2026) |
 | vorgaenge | konkrete Vorgänge, die per Checkliste durch einen Prozess laufen |
 | vorgang_schritte | Zeitstempel je Vorgang und Schritt (Heatmap, Durchlaufzeiten) |
 | nutzung | Aufrufe von Arbeitshilfen (Nutzungsauswertung) |

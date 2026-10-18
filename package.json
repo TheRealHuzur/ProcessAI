@@ -13,10 +13,9 @@
     "test": "node --no-warnings=ExperimentalWarning --test \"test/**/*.test.js\""
   },
   "dependencies": {
-    "express": "^4.21.2"
-  },
-  "devDependencies": {
-    "bpmn-moddle": "^9.0.1"
+    "bpmn-moddle": "^9.0.4",
+    "express": "^4.21.2",
+    "pdfmake": "^0.3.11"
   },
   "license": "MIT"
 }

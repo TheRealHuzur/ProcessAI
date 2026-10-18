@@ -95,3 +95,21 @@ test("Ändern: ohne Modell abgelehnt, mit Modell und Anweisung verarbeitet", asy
   assert.ok(geaendert.json.xml.includes("bpmn:definitions"));
   assert.equal(geaendert.json.aenderung.unveraendert, true);
 });
+
+test("Handbuch: PDF aus dem Modell, verständliche Meldung ohne Aktivitäten", async () => {
+  const erzeugt = await api("/api/erzeugen", { method: "POST", body: { text: "Ein Antrag geht ein und wird von der Poststelle erfasst.", prozessname: "Antrag" } });
+  const res = await fetch(`${basis}/api/handbuch`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Cookie: cookie },
+    body: JSON.stringify({ bpmnXml: erzeugt.json.xml, name: "Antrag", version: 2 })
+  });
+  assert.equal(res.status, 200);
+  assert.equal(res.headers.get("content-type"), "application/pdf");
+  assert.equal(Buffer.from(await res.arrayBuffer()).subarray(0, 5).toString(), "%PDF-");
+
+  const ohne = await api("/api/handbuch", { method: "POST", body: { bpmnXml: `<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" id="D" targetNamespace="x"><bpmn:process id="P" /></bpmn:definitions>` } });
+  assert.equal(ohne.status, 400);
+  assert.match(ohne.json.fehler, /keine Aufgaben/);
+  const kaputt = await api("/api/handbuch", { method: "POST", body: { bpmnXml: "kein XML" } });
+  assert.equal(kaputt.status, 400);
+});

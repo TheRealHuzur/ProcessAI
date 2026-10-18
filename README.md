@@ -9,8 +9,9 @@ Version 0.1 kann:
 - automatischer Regelcheck, bei Verstößen eine Korrekturrunde durch die KI
 - automatische Anordnung mit Pools und Schwimmbahnen
 - Bearbeiten im Editor (aus bpmndesk übernommen, Modi Easy, Basis, Vollständig)
-- Beschreibung (Arbeitshilfe) je Element im BPMN-Feld `documentation`
+- Beschreibung (Arbeitshilfe) je Element im BPMN-Feld `documentation`; an Aufgaben und Teilprozessen zusätzlich Dokumente, Ansprechpersonen und Rechtsgrundlagen
 - Speichern mit Versionen, Öffnen und Export als `.bpmn` und SVG
+- Handbuch als PDF: Deckblatt, Inhaltsverzeichnis, Kapitel je Schwimmbahn mit Teilprozessen und Aufgaben
 - einfacher Zugangsschutz per Passwort
 
 ## Lokal

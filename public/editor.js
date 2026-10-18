@@ -479,7 +479,9 @@
   function createModeler(container, mode) {
     return new BpmnJS({
       container,
-      additionalModules: getModulesForMode(mode)
+      additionalModules: getModulesForMode(mode),
+      // ProzessPilot: weitere Angaben am Schritt (public/wissen.js)
+      moddleExtensions: window.PPWissen ? { pp: window.PPWissen.descriptor } : {}
     });
   }
 
