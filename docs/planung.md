@@ -220,7 +220,8 @@ Am Prozess bzw. am Prozessschritt hängen:
 - faster-whisper auf Patricks Server zunächst verworfen: zu langsam, fünf Minuten Aufnahme dauern sehr lange
 - Seit 19.10.2026 doch Whisper auf dem eigenen Server (Entscheidung Patrick): Der Browser nimmt in Abschnitten auf, geschnitten an Sprechpausen (frühestens nach 6, spätestens nach 30 Sekunden), und schickt jeden Abschnitt schon während der Aufnahme über `POST /api/sprache` an den Whisper-Dienst. Nach dem Stopp wartet man nur noch auf den letzten Abschnitt. Das Ende des vorigen Abschnitts geht als Zusammenhang mit, Stille filtert der Dienst heraus (`vad_filter`). Audio wird nicht gespeichert.
 - Der Whisper-Dienst ist ein gemeinsamer Serverdienst, den auch andere Anwendungen nutzen; ProzessPilot kennt nur `WHISPER_BASE_URL`. Ohne die Variable bleibt die Browser-Erkennung.
-- Voraussetzung: genug Arbeitsspeicher auf dem Server. Am 19.10.2026 ist der Dienst bei einem Test mit 30 Sekunden Audio zweimal wegen Speichermangel abgestürzt (Modell medium, ohne int8).
+- Voraussetzung: genug Arbeitsspeicher auf dem Server. Am 19.10.2026 ist der Dienst zunächst zweimal wegen Speichermangel abgestürzt; seit Swap und `WHISPER__COMPUTE_TYPE=int8` läuft er stabil (Modell medium, etwa 1,5 GB, rund halbe Echtzeit). Live-Test „LinkedIn Freigabe“ am selben Tag sehr gut.
+- Abschnitte enden oft mitten im Satz. Die App setzt deshalb keinen Großbuchstaben und keinen Punkt an den Abschnittsanfang und entfernt die „...“, die Whisper an die Schnittstelle setzt, wenn es klein oder mit „...“ weitergeht.
 - Austauschbar bauen, damit später ein DSGVO-konformer Dienst eingesetzt werden kann
 - Texteingabe bleibt immer als Alternative
 

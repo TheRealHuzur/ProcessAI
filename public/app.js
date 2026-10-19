@@ -1049,9 +1049,25 @@
     // damit eine verbesserte Fassung ihn ersetzen kann statt ihn zu wiederholen.
     let letzterSatz = null;
 
-    sprache.onFinal = (satz, { ersetzt } = {}) => {
+    sprache.onFinal = (satz, { ersetzt, abschnitt } = {}) => {
       if (!satz) return;
       const feld = zielFeld();
+      if (abschnitt) {
+        // Server-Erkennung: Abschnitte enden oft mitten im Satz, deshalb kein Großbuchstabe und kein Punkt von der App
+        feld.value = window.PPSprache.haengeAbschnittAn(feld.value, satz);
+        letzterSatz = null;
+      } else {
+        satzEinfuegen(feld, satz, ersetzt);
+      }
+      if (feld === el.quelltext) {
+        el.quelltext.scrollTop = el.quelltext.scrollHeight;
+        aktualisiereZaehler();
+        entwurfSichern();
+      }
+    };
+
+    // Browser-Erkennung: ganze Sätze, eine verbesserte Fassung ersetzt den letzten Satz
+    function satzEinfuegen(feld, satz, ersetzt) {
       const text = satz.charAt(0).toUpperCase() + satz.slice(1);
       const mitPunkt = `${text}${/[.!?]$/.test(text) ? "" : "."}`;
       const aktuell = feld.value;
@@ -1065,12 +1081,8 @@
         feld.value = `${aktuell}${trenner}${mitPunkt}`;
         letzterSatz = { start, ende: feld.value.length };
       }
-      if (feld === el.quelltext) {
-        el.quelltext.scrollTop = el.quelltext.scrollHeight;
-        aktualisiereZaehler();
-        entwurfSichern();
-      }
-    };
+    }
+
     sprache.onZwischen = (zwischen) => {
       if (!sprache.aktiv) return;
       if (state.sprachZiel === "befehl") {

@@ -4,6 +4,8 @@ import fs from "node:fs";
 import http from "node:http";
 import os from "node:os";
 import path from "node:path";
+import vm from "node:vm";
+import { fileURLToPath } from "node:url";
 
 // Nachgebauter Whisper-Dienst: merkt sich die letzte Anfrage und antwortet wie faster-whisper-server
 let letzte = null;
@@ -109,4 +111,24 @@ test("Ohne Whisper-Adresse meldet der Endpunkt, dass nichts eingerichtet ist", a
   } finally {
     config.whisper.baseUrl = gemerkt;
   }
+});
+
+test("Abschnitte der Server-Erkennung: Punkte an der Schnittstelle fallen weg, sonst bleibt der Text, wie Whisper ihn liefert", () => {
+  const umgebung = { window: {} };
+  vm.createContext(umgebung);
+  const datei = path.join(path.dirname(fileURLToPath(import.meta.url)), "..", "public", "spracherkennung.js");
+  vm.runInContext(fs.readFileSync(datei, "utf8"), umgebung);
+  const anhaengen = umgebung.window.PPSprache.haengeAbschnittAn;
+
+  // Fälle aus dem Live-Test "LinkedIn Freigabe"
+  assert.equal(anhaengen("wenn ich einen Prozess jetzt hier ...", "einrichten möchte, schreibe ich."), "wenn ich einen Prozess jetzt hier einrichten möchte, schreibe ich.");
+  assert.equal(anhaengen("dann muss ich ihn erst...", "...im Social Desk anlegen."), "dann muss ich ihn erst im Social Desk anlegen.");
+  assert.equal(anhaengen("dann muss ich…", "… im Buffer anlegen."), "dann muss ich im Buffer anlegen.");
+  // Neuer Satz nach einem abgebrochenen: Punkte bleiben, Großschreibung bleibt
+  assert.equal(anhaengen("Und dann muss ich...", "In beiden Fällen erst eine Grafik."), "Und dann muss ich... In beiden Fällen erst eine Grafik.");
+  // Kein Großbuchstabe, kein Punkt durch die App; Pausen mitten im Abschnitt bleiben
+  assert.equal(anhaengen("Der Antrag geht ein.", "die Poststelle ... erfasst ihn"), "Der Antrag geht ein. die Poststelle ... erfasst ihn");
+  assert.equal(anhaengen("", "...also der Antrag"), "also der Antrag");
+  assert.equal(anhaengen("Text\n", "weiter"), "Text\nweiter");
+  assert.equal(anhaengen("Text", "  ...  "), "Text");
 });

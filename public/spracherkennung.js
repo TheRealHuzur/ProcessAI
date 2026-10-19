@@ -229,7 +229,7 @@
           const text = String((daten && daten.text) || "").trim();
           if (text) {
             vorher = text;
-            erkennung.onFinal(text, { ersetzt: false });
+            erkennung.onFinal(text, { abschnitt: true });
           }
         } catch (error) {
           erkennung.onStatus({ fehler: `Spracherkennung: ${error.message}` });
@@ -308,5 +308,19 @@
     return erkennung;
   }
 
-  window.PPSprache = { browser: erzeugeBrowserErkennung, server: erzeugeServerErkennung };
+  // Whisper-Abschnitte enden an Sprechpausen, oft mitten im Satz, und Whisper markiert die Schnittstelle
+  // mit "..." (am Ende des einen, am Anfang des nächsten Abschnitts). Geht es danach klein oder mit "..."
+  // weiter, fallen die Punkte an der Schnittstelle weg. Schreibung und Satzzeichen bleiben sonst, wie Whisper sie liefert.
+  function haengeAbschnittAn(bisher, abschnitt) {
+    const roh = String(abschnitt || "").trim();
+    const neu = roh.replace(/^(\.\.\.|…)\s*/, "");
+    if (!neu) return bisher;
+    let text = String(bisher || "");
+    const fortsetzung = neu !== roh || /^\p{Ll}/u.test(neu);
+    if (fortsetzung) text = text.replace(/\s*(\.\.\.|…)\s*$/, "");
+    const trenner = text && !/\s$/.test(text) ? " " : "";
+    return `${text}${trenner}${neu}`;
+  }
+
+  window.PPSprache = { browser: erzeugeBrowserErkennung, server: erzeugeServerErkennung, haengeAbschnittAn };
 })();
