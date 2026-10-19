@@ -61,6 +61,7 @@ function createRepository(db) {
       FROM prozesse p ORDER BY p.geaendert DESC`),
     prozess: db.prepare("SELECT * FROM prozesse WHERE id = ?"),
     letzteVersion: db.prepare("SELECT * FROM prozess_versionen WHERE prozess_id = ? ORDER BY version DESC LIMIT 1"),
+    version: db.prepare("SELECT * FROM prozess_versionen WHERE prozess_id = ? AND version = ?"),
     versionen: db.prepare("SELECT id, version, ki_modell, notiz, erstellt FROM prozess_versionen WHERE prozess_id = ? ORDER BY version DESC"),
     naechsteVersion: db.prepare("SELECT COALESCE(MAX(version), 0) + 1 AS n FROM prozess_versionen WHERE prozess_id = ?"),
     neuerProzess: db.prepare("INSERT INTO prozesse (id, name, erstellt, geaendert) VALUES (?, ?, ?, ?)"),
@@ -80,6 +81,10 @@ function createRepository(db) {
       const prozess = stmts.prozess.get(id);
       if (!prozess) return null;
       return { ...prozess, aktuell: stmts.letzteVersion.get(id) || null, versionen: stmts.versionen.all(id) };
+    },
+
+    holeVersion(prozessId, version) {
+      return stmts.version.get(prozessId, version) || null;
     },
 
     // Legt den Prozess an, falls nötig, und speichert eine neue Version.

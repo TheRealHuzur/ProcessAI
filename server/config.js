@@ -87,6 +87,8 @@ export const config = {
   models: readModels(),
   llmTimeoutMs: Number(process.env.LLM_TIMEOUT_MS || 180000),
   maxTextLength: 30000,
+  // Zugang für Claude Desktop über MCP (/api/mcp). Ohne Token ist die Schnittstelle abgeschaltet.
+  mcpToken: String(process.env.MCP_TOKEN || "").trim(),
   // Spracherkennung auf dem eigenen Server (Whisper, OpenAI-kompatibel). Ohne Adresse nutzt die App die des Browsers.
   whisper: {
     baseUrl: basisAdresse(process.env.WHISPER_BASE_URL).replace(/\/v1$/, ""),

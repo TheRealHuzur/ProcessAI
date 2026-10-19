@@ -8,6 +8,7 @@ import { erzeugeModell, aendereModell } from "./pipeline.js";
 import { LlmError } from "./llm.js";
 import { erzeugeHandbuch, HandbuchFehler } from "./handbuch.js";
 import { verschrifte, SpracheFehler } from "./sprache.js";
+import { mcpRouter } from "./mcp.js";
 
 export function erstelleApp({ db, llm, sprache = verschrifte } = {}) {
   const app = express();
@@ -33,6 +34,9 @@ export function erstelleApp({ db, llm, sprache = verschrifte } = {}) {
   });
   app.post("/api/anmelden", anmelden);
   app.post("/api/abmelden", abmelden);
+
+  // Claude Desktop über MCP, eigener Zugang per MCP_TOKEN statt Passwort
+  app.use("/api/mcp", mcpRouter({ db, llm }));
 
   app.use("/api", nurAngemeldet);
 
