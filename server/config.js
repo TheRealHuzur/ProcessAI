@@ -86,7 +86,17 @@ export const config = {
   sessionDays: 30,
   models: readModels(),
   llmTimeoutMs: Number(process.env.LLM_TIMEOUT_MS || 180000),
-  maxTextLength: 30000
+  maxTextLength: 30000,
+  // Spracherkennung auf dem eigenen Server (Whisper, OpenAI-kompatibel). Ohne Adresse nutzt die App die des Browsers.
+  whisper: {
+    baseUrl: basisAdresse(process.env.WHISPER_BASE_URL).replace(/\/v1$/, ""),
+    // Ohne Angabe nimmt der Dienst sein voreingestelltes Modell
+    model: String(process.env.WHISPER_MODEL || "").trim(),
+    language: "de",
+    // Fachwörter als Hilfe: ohne Vorgabe wurde im Test aus Sachbearbeitung "Nachbearbeitung", aus Kämmerei "Kämmerheit"
+    prompt: String(process.env.WHISPER_PROMPT || "Prozessbeschreibung aus der Verwaltung mit Sachbearbeitung, Poststelle, Kämmerei, Antrag und Bescheid.").trim(),
+    timeoutMs: Number(process.env.WHISPER_TIMEOUT_MS || 120000)
+  }
 };
 
 // Nur Modelle, für deren Anbieter ein API-Schlüssel und eine Adresse hinterlegt sind

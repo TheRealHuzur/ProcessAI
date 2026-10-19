@@ -13,7 +13,7 @@ Die führende Projektdoku liegt außerhalb des Repos im eigenen Storage-Ordner `
 
 ## Harte Regeln (Kurzfassung, vollständig im Start Here)
 
-- **Eigenständiges Projekt.** Keine Abhängigkeiten, Verweise, Pfade oder gemeinsame Konfiguration mit anderen Projekten auf dem Server. Erlaubt sind nur dieses Repo und der eigene Storage-Ordner.
+- **Eigenständiges Projekt.** Keine Abhängigkeiten, Verweise, Pfade oder gemeinsame Konfiguration mit anderen Projekten auf dem Server. Erlaubt sind nur dieses Repo und der eigene Storage-Ordner. Einzige Ausnahme: der gemeinsame Whisper-Dienst für die Spracherkennung, nur über `WHISPER_BASE_URL` (Entscheidung 19.10.2026).
 - **bpmndesk (github.com/TheRealHuzur/bpmndesk) wird niemals verändert.** Keine Commits, keine Branches, keine Pull Requests, kein Verschieben dort. Erlaubt ist nur, daraus in dieses Repo zu kopieren.
 - **Nichts löschen ohne Rückfrage.**
 - **Git-Aktionen und Deployments nur nach Freigabe.**

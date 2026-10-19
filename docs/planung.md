@@ -217,7 +217,10 @@ Am Prozess bzw. am Prozessschritt hängen:
 ## Spracherkennung
 
 - Zunächst Spracherkennung im Browser: einfachste und schnellste Lösung, vorerst nur für Patrick selbst
-- faster-whisper auf Patricks Server verworfen: zu langsam, fünf Minuten Aufnahme dauern sehr lange
+- faster-whisper auf Patricks Server zunächst verworfen: zu langsam, fünf Minuten Aufnahme dauern sehr lange
+- Seit 19.10.2026 doch Whisper auf dem eigenen Server (Entscheidung Patrick): Der Browser nimmt in Abschnitten auf, geschnitten an Sprechpausen (frühestens nach 6, spätestens nach 30 Sekunden), und schickt jeden Abschnitt schon während der Aufnahme über `POST /api/sprache` an den Whisper-Dienst. Nach dem Stopp wartet man nur noch auf den letzten Abschnitt. Das Ende des vorigen Abschnitts geht als Zusammenhang mit, Stille filtert der Dienst heraus (`vad_filter`). Audio wird nicht gespeichert.
+- Der Whisper-Dienst ist ein gemeinsamer Serverdienst, den auch andere Anwendungen nutzen; ProzessPilot kennt nur `WHISPER_BASE_URL`. Ohne die Variable bleibt die Browser-Erkennung.
+- Voraussetzung: genug Arbeitsspeicher auf dem Server. Am 19.10.2026 ist der Dienst bei einem Test mit 30 Sekunden Audio zweimal wegen Speichermangel abgestürzt (Modell medium, ohne int8).
 - Austauschbar bauen, damit später ein DSGVO-konformer Dienst eingesetzt werden kann
 - Texteingabe bleibt immer als Alternative
 

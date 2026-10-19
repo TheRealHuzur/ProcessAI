@@ -101,7 +101,10 @@
     befehle: [],
     bezugFrage: null,
     sprachZiel: "quelltext",
-    befehlNachStopp: false
+    befehlNachStopp: false,
+    erzeugenNachStopp: false,
+    // Gewählte Spracherkennung (Server oder Browser), gesetzt in richteSpracheEin
+    sprache: null
   };
 
   const MAX_VERLAUF = 10;
@@ -575,6 +578,13 @@
   // ---------- Aktionen ----------
 
   async function modellErzeugen() {
+    const sprache = state.sprache;
+    if (sprache && sprache.beschaeftigt && !state.kiLaeuft) {
+      // Server-Erkennung: erst die letzten Abschnitte abwarten, danach geht es von selbst weiter
+      state.erzeugenNachStopp = true;
+      if (sprache.aktiv) sprache.stop();
+      return;
+    }
     const text = el.quelltext.value.trim();
     if (text.length < 20) {
       toast("Bitte zuerst den Prozess einsprechen oder beschreiben.", "error");
@@ -582,7 +592,7 @@
       return;
     }
     if (state.kiLaeuft) return;
-    if (window.PPSprache.aktiv) window.PPSprache.stop();
+    if (sprache && sprache.aktiv) sprache.stop();
     if (state.dirty && el.leerHinweis.hidden && !window.confirm("Das aktuelle Modell wird durch den neuen Entwurf ersetzt. Weiter?")) {
       return;
     }
@@ -707,11 +717,11 @@
 
   async function befehlAusfuehren() {
     if (state.kiLaeuft) return;
-    const sprache = window.PPSprache;
-    if (sprache.aktiv && state.sprachZiel === "befehl") {
+    const sprache = state.sprache;
+    if (sprache && (sprache.aktiv || sprache.beschaeftigt) && state.sprachZiel === "befehl") {
       // Erst die Aufnahme sauber beenden, danach geht es von selbst weiter
       state.befehlNachStopp = true;
-      sprache.stop();
+      if (sprache.aktiv) sprache.stop();
       return;
     }
     const anweisung = el.befehl.value.trim();
@@ -1003,9 +1013,12 @@
 
   // ---------- Spracherkennung ----------
 
-  // Eine Spracherkennung, zwei Ziele: die Prozessbeschreibung links oder die Befehlszeile über dem Modell
-  function richteSpracheEin() {
-    const sprache = window.PPSprache;
+  // Eine Spracherkennung, zwei Ziele: die Prozessbeschreibung links oder die Befehlszeile über dem Modell.
+  // Mit Whisper auf dem Server (spracheServer) die Server-Erkennung, sonst die des Browsers.
+  function richteSpracheEin(server) {
+    const aufServer = server ? window.PPSprache.server() : null;
+    const sprache = aufServer && aufServer.istVerfuegbar ? aufServer : window.PPSprache.browser();
+    state.sprache = sprache;
     if (!sprache.istVerfuegbar) {
       el.mikro.disabled = true;
       el.befehlMikro.disabled = true;
@@ -1078,9 +1091,21 @@
           el.mikroStatus.textContent = "Ich höre zu …";
         }
       }
+      if (status.hinweis) {
+        // Aufnahme beendet, der letzte Abschnitt wird noch verschriftet
+        anzeigen(false);
+        el.mikro.disabled = true;
+        el.befehlMikro.disabled = true;
+        if (state.sprachZiel === "befehl") {
+          el.befehlFortschritt.hidden = false;
+          el.befehlFortschritt.textContent = status.hinweis;
+        } else {
+          el.mikroStatus.textContent = status.hinweis;
+        }
+      }
       if (status.fehler) {
         toast(status.fehler, "error");
-        if (!sprache.aktiv) anzeigen(false);
+        if (!sprache.aktiv && !sprache.beschaeftigt) anzeigen(false);
       }
       if (status.beendet) {
         anzeigen(false);
@@ -1090,12 +1115,17 @@
           state.befehlNachStopp = false;
           if (el.befehl.value.trim()) befehlAusfuehren();
         }
+        if (state.erzeugenNachStopp) {
+          state.erzeugenNachStopp = false;
+          modellErzeugen();
+        }
       }
     };
 
     const starte = (ziel) => {
       state.sprachZiel = ziel;
       state.befehlNachStopp = false;
+      state.erzeugenNachStopp = false;
       letzterSatz = null;
       sprache.start();
     };
@@ -1103,7 +1133,7 @@
     el.mikro.addEventListener("click", () => {
       if (sprache.aktiv) {
         sprache.stop();
-        anzeigen(false);
+        if (!sprache.beschaeftigt) anzeigen(false);
       } else {
         starte("quelltext");
       }
@@ -1165,7 +1195,6 @@
     await erstelleModeler(state.mode, LEER_XML);
     setDirty(false);
     entwurfLaden();
-    richteSpracheEin();
     if (modellEntwurf) {
       try {
         await importiere(modellEntwurf.xml);
@@ -1227,8 +1256,15 @@
     });
     window.addEventListener("resize", () => state.modeler && state.modeler.get("canvas").resized());
 
+    let sitzung = null;
     try {
-      const sitzung = await api("/api/sitzung");
+      sitzung = await api("/api/sitzung");
+    } catch (error) {
+      toast(error.message, "error");
+    }
+    richteSpracheEin(Boolean(sitzung && sitzung.spracheServer));
+    if (!sitzung) return;
+    try {
       if (!sitzung.passwortGesetzt) {
         toast("Auf dem Server ist noch kein Passwort hinterlegt (APP_PASSWORD).", "error");
         return;

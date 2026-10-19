@@ -7,8 +7,9 @@ import { anmelden, abmelden, istAngemeldet, nurAngemeldet } from "./auth.js";
 import { erzeugeModell, aendereModell } from "./pipeline.js";
 import { LlmError } from "./llm.js";
 import { erzeugeHandbuch, HandbuchFehler } from "./handbuch.js";
+import { verschrifte, SpracheFehler } from "./sprache.js";
 
-export function erstelleApp({ db, llm } = {}) {
+export function erstelleApp({ db, llm, sprache = verschrifte } = {}) {
   const app = express();
   app.disable("x-powered-by");
   app.set("trust proxy", true);
@@ -24,7 +25,11 @@ export function erstelleApp({ db, llm } = {}) {
   app.get("/api/health", (req, res) => res.json({ ok: true }));
 
   app.get("/api/sitzung", (req, res) => {
-    res.json({ angemeldet: Boolean(config.appPassword) && istAngemeldet(req), passwortGesetzt: Boolean(config.appPassword) });
+    res.json({
+      angemeldet: Boolean(config.appPassword) && istAngemeldet(req),
+      passwortGesetzt: Boolean(config.appPassword),
+      spracheServer: Boolean(config.whisper.baseUrl)
+    });
   });
   app.post("/api/anmelden", anmelden);
   app.post("/api/abmelden", abmelden);
@@ -91,6 +96,21 @@ export function erstelleApp({ db, llm } = {}) {
     }
   });
 
+  // Ein Audioabschnitt aus dem Browser wird zu Text. Das Audio wird nicht gespeichert.
+  app.post("/api/sprache", express.raw({ type: ["audio/*", "video/webm", "application/octet-stream"], limit: "10mb" }), async (req, res) => {
+    if (!Buffer.isBuffer(req.body) || req.body.length === 0) {
+      return res.status(400).json({ fehler: "Es ist keine Aufnahme angekommen." });
+    }
+    try {
+      const text = await sprache(req.body, { mimeType: req.get("content-type"), vorher: vorherigerText(req.get("x-vorher")) });
+      return res.json({ text });
+    } catch (error) {
+      if (error instanceof SpracheFehler) return res.status(error.status).json({ fehler: error.message });
+      console.error("Spracherkennung fehlgeschlagen:", error);
+      return res.status(500).json({ fehler: "Unerwarteter Fehler bei der Spracherkennung." });
+    }
+  });
+
   // Handbuch als PDF aus dem aktuellen Modell im Editor (auch ungespeichert)
   app.post("/api/handbuch", async (req, res) => {
     const body = req.body || {};
@@ -149,6 +169,15 @@ export function erstelleApp({ db, llm } = {}) {
   app.use((req, res) => res.status(404).sendFile(path.join(ROOT_DIR, "public", "index.html")));
 
   return app;
+}
+
+// Der Browser schickt das Ende des vorigen Abschnitts URL-kodiert mit (Kopfzeilen vertragen keine Sonderzeichen)
+function vorherigerText(wert) {
+  try {
+    return decodeURIComponent(String(wert || "")).slice(-300);
+  } catch {
+    return "";
+  }
 }
 
 const istHauptmodul = process.argv[1] && path.resolve(process.argv[1]) === path.resolve(ROOT_DIR, "server", "index.js");
