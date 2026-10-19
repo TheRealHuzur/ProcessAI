@@ -71,8 +71,8 @@ Danach in Version 1: Rückfragen der KI im Dialog, Sprachbefehle im Editor.
 - ~~Fragen als Signal~~ verschoben zum Chatbot (18.10.2026): Jede Frage an den Chatbot, die nicht beantwortet werden kann, landet sofort auf einer Liste (Wissenslücke). Hängt am Chatbot und ist damit eine KI-Funktion; in Version 1 keine weiteren KI-Funktionen
 
 **Gesetzt, Version noch offen**
-- Wissen gemeinsam pflegen: Kolleginnen und Kollegen kommentieren, ergänzen oder schlagen Ergänzungen vor; eine Rolle kuratiert, gibt frei und strukturiert; wachsendes, lebendes Konstrukt
-- Chatbot als Frontend: Frage zu einem Prozess, Chatbot sucht die Antwort heraus und zeigt sie direkt im Modell ("hier bist du")
+- Wissen gemeinsam pflegen: Kolleginnen und Kollegen kommentieren, ergänzen oder schlagen Ergänzungen vor; eine Rolle kuratiert, gibt frei und strukturiert; wachsendes, lebendes Konstrukt (erste Fassung gebaut 19.10.2026: Kommentare und Ergänzungen am Schritt, Liste offener Einträge, Übernahme in die Arbeitshilfe; zwei Konten, Rollenkonzept folgt)
+- Chatbot als Frontend: Frage zu einem Prozess, Chatbot sucht die Antwort heraus und zeigt sie direkt im Modell ("hier bist du") (gebaut 19.10.2026 als eigene Seite `/chat`: Prozessauswahl links, Modellauswahl unten links, Fundstellen als Links in den Editor)
 - Checkliste für einen konkreten Vorgang (unbedingt)
 - Teilen per Link zum Kommentieren ohne Anmeldung (Komplexität prüfen)
 - Wissenslücken-Radar: zeigt Schritte ohne Arbeitshilfe

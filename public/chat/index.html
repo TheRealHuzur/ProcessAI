@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ProzessPilot Chat</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%230b162a'/%3E%3Cpath d='M18 46 L32 14 L46 46 L32 38 Z' fill='%230ea5e9'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="/chat/chat.css">
+</head>
+<body>
+  <div class="chat-shell">
+    <aside class="seite" aria-label="Prozesse und Modell">
+      <div class="seite-kopf">
+        <a class="marke" href="/" title="Zum ProzessPilot"><span class="marke-dunkel">Prozess</span><span class="marke-hell">Pilot</span></a>
+        <span class="marke-zusatz">Chat</span>
+      </div>
+      <h2 class="seite-titel">Meine Prozesse</h2>
+      <input class="eingabe-feld suche" id="suche" type="search" placeholder="Prozess suchen" autocomplete="off" aria-label="Prozess suchen">
+      <ul class="prozesse" id="prozesse" aria-label="Prozess auswählen"></ul>
+      <div class="seite-unten">
+        <label class="feld-titel" for="modell">KI-Modell</label>
+        <select class="eingabe-feld" id="modell"></select>
+        <p class="hinweis">Nur mit Testprozessen nutzen. Der Chat antwortet nur aus dem hinterlegten Wissen der neuesten Version.</p>
+      </div>
+    </aside>
+
+    <main class="haupt">
+      <form class="frage-zeile" id="frage-form">
+        <textarea class="eingabe-feld frage" id="frage" rows="1" maxlength="1000" placeholder="Frag etwas zum Prozess …" aria-label="Frage"></textarea>
+        <button class="senden" id="senden" type="submit" aria-label="Frage senden" title="Senden (Enter)">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h14"></path><path d="M13 6l6 6-6 6"></path></svg>
+        </button>
+      </form>
+      <p class="status" id="status" aria-live="polite"></p>
+      <section class="antworten" id="antworten" aria-live="polite"></section>
+    </main>
+  </div>
+  <script src="/chat/chat.js"></script>
+</body>
+</html>

@@ -1,14 +1,16 @@
 // ProzessPilot: Webserver und Schnittstelle
 import path from "node:path";
 import express from "express";
-import { config, findModel, verfuegbareModelle, ROOT_DIR } from "./config.js";
+import { config, findModel, verfuegbareModelle, findChatModel, verfuegbareChatModelle, ROOT_DIR } from "./config.js";
 import { oeffneDatenbank } from "./db.js";
-import { anmelden, abmelden, istAngemeldet, nurAngemeldet } from "./auth.js";
+import { anmelden, abmelden, angemeldetesKonto, nurAngemeldet } from "./auth.js";
 import { erzeugeModell, aendereModell } from "./pipeline.js";
 import { LlmError } from "./llm.js";
 import { erzeugeHandbuch, HandbuchFehler } from "./handbuch.js";
 import { verschrifte, SpracheFehler } from "./sprache.js";
 import { mcpRouter } from "./mcp.js";
+import { beantworteFrage, ChatFehler, MAX_FRAGE } from "./chat.js";
+import { neuerKommentar, entscheide, KommentarFehler } from "./kommentare.js";
 
 export function erstelleApp({ db, llm, sprache = verschrifte } = {}) {
   const app = express();
@@ -26,8 +28,10 @@ export function erstelleApp({ db, llm, sprache = verschrifte } = {}) {
   app.get("/api/health", (req, res) => res.json({ ok: true }));
 
   app.get("/api/sitzung", (req, res) => {
+    const konto = config.appPassword ? angemeldetesKonto(req) : null;
     res.json({
-      angemeldet: Boolean(config.appPassword) && istAngemeldet(req),
+      angemeldet: Boolean(konto),
+      konto: konto ? konto.name : null,
       passwortGesetzt: Boolean(config.appPassword),
       spracheServer: Boolean(config.whisper.baseUrl)
     });
@@ -167,12 +171,90 @@ export function erstelleApp({ db, llm, sprache = verschrifte } = {}) {
     res.status(ok ? 200 : 404).json({ ok });
   });
 
+  // Kommentare und Ergänzungsvorschläge am Schritt
+  app.get("/api/prozesse/:id/kommentare", (req, res) => {
+    if (!db.holeProzess(req.params.id)) return res.status(404).json({ fehler: "Prozess nicht gefunden." });
+    return res.json(db.listeKommentare(req.params.id));
+  });
+
+  app.post("/api/prozesse/:id/kommentare", async (req, res) => {
+    const body = req.body || {};
+    try {
+      const kommentar = await neuerKommentar(db, req.params.id, {
+        elementId: String(body.elementId || "").trim(),
+        art: String(body.art || "").trim(),
+        text: String(body.text || "").trim(),
+        konto: req.konto.name
+      });
+      return res.json(kommentar);
+    } catch (error) {
+      return kommentarFehler(res, error);
+    }
+  });
+
+  // Offene Einträge aller Prozesse für die Vorschlagsliste
+  app.get("/api/kommentare/offen", (req, res) => {
+    res.json(db.offeneKommentare());
+  });
+
+  app.post("/api/kommentare/:id/entscheiden", async (req, res) => {
+    const body = req.body || {};
+    try {
+      const ergebnis = await entscheide(db, req.params.id, {
+        aktion: String(body.aktion || ""),
+        text: String(body.text || "").trim(),
+        konto: req.konto.name
+      });
+      return res.json(ergebnis);
+    } catch (error) {
+      return kommentarFehler(res, error);
+    }
+  });
+
+  // Chatbot: antwortet nur aus dem Wissen der neuesten Version eines Prozesses
+  app.get("/api/chat/modelle", (req, res) => {
+    const modelle = verfuegbareChatModelle();
+    res.json((modelle.length ? modelle : config.chatModels).map(({ id, label }) => ({ id, label })));
+  });
+
+  app.post("/api/chat", async (req, res) => {
+    const body = req.body || {};
+    const frage = String(body.frage || "").trim();
+    if (frage.length < 2) return res.status(400).json({ fehler: "Bitte eine Frage eingeben." });
+    if (frage.length > MAX_FRAGE) return res.status(400).json({ fehler: `Die Frage ist zu lang (höchstens ${MAX_FRAGE} Zeichen).` });
+    const prozess = db.holeProzess(String(body.prozessId || ""));
+    if (!prozess) return res.status(404).json({ fehler: "Bitte links einen Prozess auswählen." });
+    const model = findChatModel(String(body.modell || "")) || verfuegbareChatModelle()[0] || config.chatModels[0];
+    const beginn = Date.now();
+    try {
+      const ergebnis = await beantworteFrage({ prozess, frage, verlauf: body.verlauf, model, ...(llm ? { llm } : {}) });
+      return res.json({ ...ergebnis, modell: model.id, dauerMs: Date.now() - beginn });
+    } catch (error) {
+      if (error instanceof ChatFehler) return res.status(error.status).json({ fehler: error.message });
+      console.error("Chat fehlgeschlagen:", error);
+      const status = error instanceof LlmError ? 502 : 500;
+      return res.status(status).json({ fehler: error instanceof LlmError ? error.message : "Unerwarteter Fehler beim Chat." });
+    }
+  });
+
   app.use("/api", (req, res) => res.status(404).json({ fehler: "Unbekannte Schnittstelle." }));
+
+  // Eigene Oberfläche für den Chatbot, schon die Seite nur nach Anmeldung
+  app.use("/chat", (req, res, next) => {
+    if (config.appPassword && angemeldetesKonto(req)) return next();
+    return res.redirect(302, "/?weiter=chat");
+  }, express.static(path.join(ROOT_DIR, "public", "chat"), { index: "index.html", maxAge: "1h" }));
 
   app.use(express.static(path.join(ROOT_DIR, "public"), { index: "index.html", maxAge: "1h" }));
   app.use((req, res) => res.status(404).sendFile(path.join(ROOT_DIR, "public", "index.html")));
 
   return app;
+}
+
+function kommentarFehler(res, error) {
+  if (error instanceof KommentarFehler) return res.status(error.status).json({ fehler: error.message });
+  console.error("Kommentar fehlgeschlagen:", error);
+  return res.status(500).json({ fehler: "Unerwarteter Fehler bei Kommentaren." });
 }
 
 // Der Browser schickt das Ende des vorigen Abschnitts URL-kodiert mit (Kopfzeilen vertragen keine Sonderzeichen)

@@ -77,10 +77,41 @@ function readModels() {
   return DEFAULT_MODELS;
 }
 
+// Modelle für den Chatbot, eigene Liste. Überschreibbar per CHAT_MODELS_JSON (gleiche Struktur wie MODELS_JSON).
+const DEFAULT_CHAT_MODELS = [
+  { id: "deepseek/deepseek-v4-flash-20260423", label: "DeepSeek V4 Flash", provider: "openrouter" }
+];
+
+function readChatModels() {
+  if (!process.env.CHAT_MODELS_JSON) return DEFAULT_CHAT_MODELS;
+  try {
+    const parsed = JSON.parse(process.env.CHAT_MODELS_JSON);
+    if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+  } catch (error) {
+    console.error("CHAT_MODELS_JSON ist kein gültiges JSON, Standardmodelle werden verwendet.", error.message);
+  }
+  return DEFAULT_CHAT_MODELS;
+}
+
+// Konten zum Anmelden. Das Passwort bestimmt das Konto. Ein Rollenkonzept folgt; bis dahin dürfen beide Konten dasselbe.
+function readKonten() {
+  const konten = [
+    { id: "konto1", name: String(process.env.KONTO1_NAME || "").trim() || "Hauptkonto", passwort: process.env.APP_PASSWORD || "" },
+    { id: "konto2", name: String(process.env.KONTO2_NAME || "").trim() || "Zweites Konto", passwort: process.env.KONTO2_PASSWORT || "" }
+  ];
+  if (konten[1].passwort && konten[1].passwort === konten[0].passwort) {
+    console.error("KONTO2_PASSWORT ist gleich APP_PASSWORD, das zweite Konto bleibt abgeschaltet.");
+    konten[1].passwort = "";
+  }
+  return konten;
+}
+
 export const config = {
   port: Number(process.env.PORT || 3000),
   dataDir: process.env.DATA_DIR || path.join(ROOT_DIR, "data"),
   appPassword: process.env.APP_PASSWORD || "",
+  konten: readKonten(),
+  chatModels: readChatModels(),
   // Ohne SESSION_SECRET wird bei jedem Neustart ein neues erzeugt (dann neu anmelden).
   sessionSecret: process.env.SESSION_SECRET || crypto.randomBytes(32).toString("hex"),
   sessionDays: 30,
@@ -102,13 +133,25 @@ export const config = {
 };
 
 // Nur Modelle, für deren Anbieter ein API-Schlüssel und eine Adresse hinterlegt sind
-export function verfuegbareModelle() {
-  return config.models.filter((model) => {
+function nurVerfuegbare(models) {
+  return models.filter((model) => {
     const provider = PROVIDERS[model.provider];
     return provider && Boolean(provider.baseUrl) && Boolean(process.env[provider.apiKeyEnv]);
   });
 }
 
+export function verfuegbareModelle() {
+  return nurVerfuegbare(config.models);
+}
+
 export function findModel(modelId) {
   return verfuegbareModelle().find((model) => model.id === modelId) || null;
+}
+
+export function verfuegbareChatModelle() {
+  return nurVerfuegbare(config.chatModels);
+}
+
+export function findChatModel(modelId) {
+  return verfuegbareChatModelle().find((model) => model.id === modelId) || null;
 }

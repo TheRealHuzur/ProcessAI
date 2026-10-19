@@ -47,7 +47,15 @@
     befehlBezugText: $("befehl-bezug-text"),
     rueckgaengig: $("btn-rueckgaengig"),
     blockAenderungen: $("block-aenderungen"),
-    listeAenderungen: $("liste-aenderungen")
+    listeAenderungen: $("liste-aenderungen"),
+    elementKommentare: $("element-kommentare"),
+    kommentarListe: $("kommentar-liste"),
+    kommentarHinweis: $("kommentar-hinweis"),
+    kommentarForm: $("kommentar-form"),
+    kommentarText: $("kommentar-text"),
+    dialogVorschlaege: $("dialog-vorschlaege"),
+    vorschlagListe: $("vorschlag-liste"),
+    vorschlaegeZahl: $("vorschlaege-zahl")
   };
 
   const LEER_XML = `<?xml version="1.0" encoding="UTF-8"?>
@@ -104,8 +112,14 @@
     befehlNachStopp: false,
     erzeugenNachStopp: false,
     // Gewählte Spracherkennung (Server oder Browser), gesetzt in richteSpracheEin
-    sprache: null
+    sprache: null,
+    // Kommentare und Vorschläge des gespeicherten Prozesses (kommentareFuer: dessen id)
+    kommentare: [],
+    kommentareFuer: null
   };
+
+  // Aufruf aus dem Chat (?prozess=…&element=…) oder Rückweg nach der Anmeldung (?weiter=chat)
+  const adresse = new URLSearchParams(window.location.search);
 
   const MAX_VERLAUF = 10;
 
@@ -260,7 +274,10 @@
       verbergeLeerHinweis();
       aktualisiereWissenMarker();
     });
-    eventBus.on("import.done", () => aktualisiereWissenMarker());
+    eventBus.on("import.done", () => {
+      aktualisiereWissenMarker();
+      aktualisiereKommentarMarker();
+    });
     eventBus.on("selection.changed", ({ newSelection }) => {
       zeigeElementPanel(newSelection.length === 1 ? newSelection[0] : null);
     });
@@ -398,6 +415,7 @@
     }
     state.ausgewaehlt = element;
     fuellePanel(element, {});
+    zeigeKommentare(element);
     el.panelElement.hidden = false;
     aktualisiereBezug();
   }
@@ -503,6 +521,245 @@
       overlays.add(element, "pp-wissen", { position: { bottom: 20, right: 22 }, html: marker });
     }
   }, 150);
+
+  // ---------- Kommentare und Vorschläge am Schritt ----------
+
+  const ART_NAMEN = { kommentar: "Kommentar", vorschlag: "Ergänzung zur Arbeitshilfe" };
+  const STATUS_NAMEN = { uebernommen: "übernommen", erledigt: "erledigt", abgelehnt: "abgelehnt" };
+
+  // Kommentieren lassen sich Schritte, Ereignisse und Gateways
+  function istSchritt(element) {
+    const bo = element && element.businessObject;
+    return Boolean(bo && bo.$instanceOf && bo.$instanceOf("bpmn:FlowNode"));
+  }
+
+  function datum(iso) {
+    return new Date(iso).toLocaleString("de-DE", { dateStyle: "medium", timeStyle: "short" });
+  }
+
+  function aktuelleKommentare() {
+    return state.kommentareFuer && state.kommentareFuer === state.prozessId ? state.kommentare : [];
+  }
+
+  async function ladeKommentare() {
+    if (!state.prozessId) {
+      state.kommentare = [];
+      state.kommentareFuer = null;
+    } else {
+      try {
+        state.kommentare = await api(`/api/prozesse/${encodeURIComponent(state.prozessId)}/kommentare`);
+        state.kommentareFuer = state.prozessId;
+      } catch (error) {
+        if (error.status !== 401) toast(`Kommentare nicht geladen: ${error.message}`, "error");
+        return;
+      }
+    }
+    aktualisiereKommentarMarker();
+    if (state.ausgewaehlt) zeigeKommentare(state.ausgewaehlt);
+  }
+
+  function zeigeKommentare(element) {
+    el.elementKommentare.hidden = !istSchritt(element);
+    if (el.elementKommentare.hidden) return;
+    const gespeichert = Boolean(state.prozessId);
+    el.kommentarHinweis.hidden = gespeichert;
+    el.kommentarForm.hidden = !gespeichert;
+    const id = element.businessObject.id;
+    el.kommentarListe.replaceChildren(...aktuelleKommentare().filter((k) => k.element_id === id).map((k) => kommentarEintrag(k)));
+  }
+
+  function knopf(text, klasse, onClick) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = klasse;
+    b.textContent = text;
+    b.addEventListener("click", onClick);
+    return b;
+  }
+
+  // Ein Eintrag für das Seitenfeld oder, mit imDialog, für die Liste aller offenen Einträge
+  function kommentarEintrag(k, { imDialog = false } = {}) {
+    const li = document.createElement("li");
+    li.className = "kommentar";
+    li.dataset.status = k.status;
+    li.dataset.art = k.art;
+    const kopf = document.createElement("div");
+    kopf.className = "kommentar-kopf";
+    const art = document.createElement("span");
+    art.className = "kommentar-art-name";
+    art.textContent = ART_NAMEN[k.art] || k.art;
+    kopf.append(art);
+    if (imDialog) {
+      const wo = document.createElement("span");
+      wo.className = "kommentar-wo";
+      wo.textContent = `${k.prozess_name} › ${k.element_name || k.element_id}`;
+      kopf.append(wo);
+    }
+    if (STATUS_NAMEN[k.status]) {
+      const status = document.createElement("span");
+      status.className = "kommentar-status";
+      status.textContent = STATUS_NAMEN[k.status];
+      kopf.append(status);
+    }
+    li.append(kopf);
+
+    let textFeld = null;
+    if (imDialog && k.status === "offen" && k.art === "vorschlag") {
+      textFeld = document.createElement("textarea");
+      textFeld.className = "input textarea textarea-wissen";
+      textFeld.rows = 3;
+      textFeld.maxLength = 4000;
+      textFeld.value = k.text;
+      textFeld.setAttribute("aria-label", "Text, der in die Arbeitshilfe übernommen wird");
+      li.append(textFeld);
+    } else {
+      const text = document.createElement("p");
+      text.className = "kommentar-text";
+      text.textContent = k.text;
+      li.append(text);
+    }
+
+    const meta = document.createElement("p");
+    meta.className = "kommentar-meta";
+    meta.textContent = `${k.verfasst_von || "unbekannt"}, ${datum(k.erstellt)}`
+      + (k.entschieden ? `. ${STATUS_NAMEN[k.status] || k.status} von ${k.entschieden_von || "unbekannt"}, ${datum(k.entschieden)}` : "")
+      + (k.version_uebernommen ? ` (Version ${k.version_uebernommen})` : "");
+    li.append(meta);
+
+    if (k.status === "offen") {
+      const knoepfe = document.createElement("div");
+      knoepfe.className = "kommentar-knoepfe";
+      const [aktion, titel] = k.art === "vorschlag" ? ["uebernehmen", "Übernehmen"] : ["erledigt", "Erledigt"];
+      knoepfe.append(
+        knopf(titel, "btn btn-primary btn-klein", () => entscheideKommentar(k, aktion, textFeld ? textFeld.value.trim() : "")),
+        knopf("Ablehnen", "btn btn-secondary btn-klein", () => entscheideKommentar(k, "ablehnen", ""))
+      );
+      if (imDialog) knoepfe.append(knopf("Zum Schritt", "btn btn-ghost btn-klein", () => zumSchritt(k)));
+      li.append(knoepfe);
+    }
+    return li;
+  }
+
+  async function kommentarAbschicken() {
+    const element = state.ausgewaehlt;
+    if (!istSchritt(element) || !state.prozessId) return;
+    const text = el.kommentarText.value.trim();
+    if (!text) {
+      toast("Bitte zuerst etwas schreiben.", "error");
+      return;
+    }
+    const art = document.querySelector('input[name="kommentar-art"]:checked').value;
+    try {
+      await api(`/api/prozesse/${encodeURIComponent(state.prozessId)}/kommentare`, {
+        method: "POST",
+        body: { elementId: element.businessObject.id, art, text }
+      });
+      el.kommentarText.value = "";
+      toast(art === "vorschlag" ? "Vorschlag gespeichert. Er steht unter „Vorschläge“, bis jemand entscheidet." : "Kommentar gespeichert.", "ok");
+      await ladeKommentare();
+      aktualisiereVorschlagZahl();
+    } catch (error) {
+      if (error.status !== 401) toast(error.message, "error");
+    }
+  }
+
+  async function entscheideKommentar(k, aktion, text) {
+    const imEditor = k.prozess_id === state.prozessId;
+    // Die Übernahme speichert eine neue Version; ungespeicherte Änderungen im Editor würden sie sonst überschreiben
+    if (aktion === "uebernehmen" && imEditor && state.dirty) {
+      toast("Bitte zuerst speichern. Danach lässt sich die Ergänzung übernehmen, ohne dass etwas verloren geht.", "error");
+      return;
+    }
+    if (aktion === "ablehnen" && !window.confirm(`${ART_NAMEN[k.art]} ablehnen?`)) return;
+    try {
+      const ergebnis = await api(`/api/kommentare/${encodeURIComponent(k.id)}/entscheiden`, { method: "POST", body: { aktion, text } });
+      if (ergebnis.version) {
+        toast(`In die Arbeitshilfe übernommen, Version ${ergebnis.version}.`, "ok");
+        if (imEditor) {
+          await ladeProzess(k.prozess_id, { felderBehalten: true, still: true });
+          springeZu(k.element_id);
+        }
+      } else {
+        toast(aktion === "ablehnen" ? "Abgelehnt." : "Als erledigt markiert.", "ok");
+        if (imEditor) await ladeKommentare();
+      }
+    } catch (error) {
+      if (error.status !== 401) toast(error.message, "error");
+    }
+    aktualisiereVorschlagZahl();
+    if (el.dialogVorschlaege.open) zeigeVorschlaege();
+  }
+
+  // Sprechblase mit der Zahl offener Einträge an jedem Schritt
+  const aktualisiereKommentarMarker = debounce(() => {
+    if (!state.modeler) return;
+    const overlays = state.modeler.get("overlays");
+    overlays.remove({ type: "pp-kommentar" });
+    const offen = new Map();
+    for (const k of aktuelleKommentare()) {
+      if (k.status === "offen") offen.set(k.element_id, (offen.get(k.element_id) || 0) + 1);
+    }
+    if (!offen.size) return;
+    for (const element of state.modeler.get("elementRegistry").getAll()) {
+      if (!element.parent || element.labelTarget || !istSchritt(element)) continue;
+      const anzahl = offen.get(element.businessObject.id);
+      if (!anzahl) continue;
+      const marker = document.createElement("button");
+      marker.type = "button";
+      marker.className = "pp-kommentar-marker";
+      marker.title = `${anzahl} offene Kommentare oder Vorschläge`;
+      marker.innerHTML = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v10H9l-4 4z"></path></svg>';
+      marker.append(String(anzahl));
+      marker.addEventListener("click", (event) => {
+        event.stopPropagation();
+        state.modeler.get("selection").select(element);
+      });
+      overlays.add(element, "pp-kommentar", { position: { top: -12, right: 14 }, html: marker });
+    }
+  }, 150);
+
+  // ---------- Liste offener Einträge aller Prozesse ----------
+
+  function setzeVorschlagZahl(anzahl) {
+    el.vorschlaegeZahl.textContent = String(anzahl);
+    el.vorschlaegeZahl.hidden = anzahl === 0;
+  }
+
+  async function aktualisiereVorschlagZahl() {
+    try {
+      setzeVorschlagZahl((await api("/api/kommentare/offen")).length);
+    } catch {
+      /* Zahl bleibt stehen */
+    }
+  }
+
+  async function zeigeVorschlaege() {
+    if (!el.dialogVorschlaege.open) {
+      el.vorschlagListe.innerHTML = `<li class="prozess-leer">Wird geladen …</li>`;
+      el.dialogVorschlaege.showModal();
+    }
+    try {
+      const liste = await api("/api/kommentare/offen");
+      setzeVorschlagZahl(liste.length);
+      if (liste.length === 0) {
+        el.vorschlagListe.innerHTML = `<li class="prozess-leer">Nichts offen.</li>`;
+        return;
+      }
+      el.vorschlagListe.replaceChildren(...liste.map((k) => kommentarEintrag(k, { imDialog: true })));
+    } catch (error) {
+      el.vorschlagListe.innerHTML = "";
+      if (error.status !== 401) toast(error.message, "error");
+    }
+  }
+
+  async function zumSchritt(k) {
+    if (k.prozess_id !== state.prozessId) {
+      if (state.dirty && !window.confirm("Ungespeicherte Änderungen gehen verloren. Trotzdem öffnen?")) return;
+      await ladeProzess(k.prozess_id);
+    }
+    el.dialogVorschlaege.close();
+    springeZu(k.element_id);
+  }
 
   // ---------- Ergebnis anzeigen ----------
 
@@ -803,12 +1060,13 @@
       speicherSchreiben("pp.prozessId", ergebnis.id);
       setDirty(false);
       toast(`Gespeichert als Version ${ergebnis.version}.`, "ok");
+      await ladeKommentare();
     } catch (error) {
       if (error.status !== 401) toast(`Speichern fehlgeschlagen: ${error.message}`, "error");
     }
   }
 
-  async function ladeProzess(id, { felderBehalten = false } = {}) {
+  async function ladeProzess(id, { felderBehalten = false, still = false } = {}) {
     try {
       const prozess = await api(`/api/prozesse/${encodeURIComponent(id)}`);
       if (!prozess.aktuell) throw new Error("Keine Version vorhanden.");
@@ -828,7 +1086,8 @@
       speicherSchreiben("pp.prozessId", prozess.id);
       el.ergebnis.hidden = true;
       setDirty(false);
-      toast(`"${prozess.name}" geladen (Version ${prozess.aktuell.version}).`);
+      await ladeKommentare();
+      if (!still) toast(`"${prozess.name}" geladen (Version ${prozess.aktuell.version}).`);
     } catch (error) {
       if (error.status !== 401) toast(`Laden fehlgeschlagen: ${error.message}`, "error");
     }
@@ -906,6 +1165,7 @@
     verlaufLeeren();
     state.prozessId = null;
     state.letzteErzeugung = null;
+    ladeKommentare();
     el.prozessname.value = "";
     el.quelltext.value = "";
     aktualisiereZaehler();
@@ -932,6 +1192,7 @@
         verlaufLeeren();
         state.prozessId = null;
         state.letzteErzeugung = null;
+        ladeKommentare();
         const definitions = state.modeler.getDefinitions();
         const prozess = (definitions.rootElements || []).find((r) => r.$type === "bpmn:Process");
         el.prozessname.value = (prozess && prozess.name) || datei.name.replace(/\.(bpmn|xml)$/i, "");
@@ -1174,10 +1435,11 @@
   el.formLogin.addEventListener("submit", async (event) => {
     event.preventDefault();
     try {
-      await api("/api/anmelden", { method: "POST", body: { passwort: el.loginPasswort.value } });
+      const anmeldung = await api("/api/anmelden", { method: "POST", body: { passwort: el.loginPasswort.value } });
       el.loginPasswort.value = "";
       el.dialogLogin.close();
-      await ladeModelle();
+      if (await nachAnmeldung(anmeldung.konto)) return;
+      await oeffneAusAdresse();
     } catch (error) {
       el.loginFehler.textContent = error.message;
       el.loginFehler.hidden = false;
@@ -1197,9 +1459,39 @@
     if (gewaehlt && modelle.some((m) => m.id === gewaehlt)) el.modell.value = gewaehlt;
   }
 
+  // Liefert true, wenn es gleich zum Chat weitergeht
+  async function nachAnmeldung(konto) {
+    if (adresse.get("weiter") === "chat") {
+      window.location.replace("/chat/");
+      return true;
+    }
+    $("btn-abmelden").title = konto ? `Abmelden (angemeldet als ${konto})` : "Abmelden";
+    await ladeModelle();
+    aktualisiereVorschlagZahl();
+    return false;
+  }
+
+  // Öffnet den Prozess aus dem Chat und wählt die Fundstelle aus; true, wenn die Adresse einen Prozess nannte
+  async function oeffneAusAdresse() {
+    const id = adresse.get("prozess");
+    const elementId = adresse.get("element");
+    if (!id) return false;
+    adresse.delete("prozess");
+    adresse.delete("element");
+    window.history.replaceState(null, "", window.location.pathname);
+    if (id !== state.prozessId || !state.dirty) {
+      if (state.dirty && !window.confirm("Im Editor gibt es ungespeicherte Änderungen. Trotzdem den Prozess aus dem Chat öffnen?")) return true;
+      await ladeProzess(id);
+    }
+    if (elementId && id === state.prozessId) springeZu(elementId);
+    return true;
+  }
+
   // ---------- Start ----------
 
   async function start() {
+    // Links aus dem Chat öffnen dieses Fenster statt eines zweiten Editors
+    if (!window.name) window.name = "prozesspilot";
     // Vor dem ersten Import lesen, der Import selbst setzt den Änderungsstatus zurück
     const modellEntwurf = modellEntwurfLesen();
     baueModeButtons();
@@ -1229,6 +1521,9 @@
     $("btn-export").addEventListener("click", exportBpmn);
     $("btn-svg").addEventListener("click", exportSvg);
     $("btn-handbuch").addEventListener("click", exportHandbuch);
+    $("btn-vorschlaege").addEventListener("click", zeigeVorschlaege);
+    $("btn-kommentar").addEventListener("click", kommentarAbschicken);
+    el.dialogVorschlaege.querySelector("[data-close]").addEventListener("click", () => el.dialogVorschlaege.close());
     $("btn-selbst-zeichnen").addEventListener("click", verbergeLeerHinweis);
     $("btn-element-schliessen").addEventListener("click", () => state.modeler.get("selection").select([]));
     el.befehlAusfuehren.addEventListener("click", befehlAusfuehren);
@@ -1285,7 +1580,8 @@
         zeigeLogin();
         return;
       }
-      await ladeModelle();
+      if (await nachAnmeldung(sitzung.konto)) return;
+      if (await oeffneAusAdresse()) return;
       const letzte = speicherLesen("pp.prozessId");
       if (letzte && !modellEntwurf) await ladeProzess(letzte, { felderBehalten: Boolean(speicherLesen("pp.entwurf")) });
     } catch (error) {

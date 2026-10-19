@@ -48,6 +48,15 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h9a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"></path><path d="M5 17a3 3 0 0 1 3-3h9"></path></svg>
           <span class="btn-label">Handbuch</span>
         </button>
+        <button class="btn btn-secondary" id="btn-vorschlaege" type="button" title="Offene Kommentare und Vorschläge aller Prozesse">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v10H9l-4 4z"></path></svg>
+          <span class="btn-label">Vorschläge</span>
+          <span class="zaehler-badge" id="vorschlaege-zahl" hidden></span>
+        </button>
+        <a class="btn btn-secondary" id="btn-chat" href="/chat/" target="prozesspilot-chat" title="Fragen zu deinen Prozessen stellen">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v11H8l-4 4z"></path><path d="M8 9h8M8 12h5"></path></svg>
+          <span class="btn-label">Chat</span>
+        </a>
         <button class="btn btn-ghost" id="btn-abmelden" type="button" title="Abmelden">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4h4v16h-4"></path><path d="M10 8l-4 4 4 4"></path><path d="M6 12h10"></path></svg>
         </button>
@@ -157,6 +166,19 @@
             <label class="field-label" for="element-beschreibung">Beschreibung / Arbeitshilfe</label>
             <textarea class="input textarea textarea-klein" id="element-beschreibung" placeholder="Was mache ich in diesem Schritt eigentlich? Steht im BPMN-Beschreibungsfeld und reist beim Export mit."></textarea>
             <div class="element-wissen" id="element-wissen" hidden></div>
+            <div class="element-kommentare" id="element-kommentare" hidden>
+              <h3 class="kommentare-titel">Kommentare und Vorschläge</h3>
+              <ul class="kommentar-liste" id="kommentar-liste"></ul>
+              <p class="muted klein" id="kommentar-hinweis" hidden>Speichere den Prozess, dann kannst du hier kommentieren.</p>
+              <div class="kommentar-form" id="kommentar-form">
+                <div class="kommentar-art" role="radiogroup" aria-label="Art des Eintrags">
+                  <label><input type="radio" name="kommentar-art" value="kommentar" checked> Kommentar</label>
+                  <label><input type="radio" name="kommentar-art" value="vorschlag"> Ergänzung zur Arbeitshilfe</label>
+                </div>
+                <textarea class="input textarea textarea-wissen" id="kommentar-text" rows="2" maxlength="4000" placeholder="Hinweis, Frage oder Ergänzung zu diesem Schritt"></textarea>
+                <button class="btn btn-secondary" id="btn-kommentar" type="button">Abschicken</button>
+              </div>
+            </div>
             <p class="muted klein" id="element-id"></p>
           </aside>
         </div>
@@ -174,6 +196,17 @@
       </button>
     </div>
     <ul class="prozess-liste" id="prozess-liste"></ul>
+  </dialog>
+
+  <dialog class="dialog dialog-breit" id="dialog-vorschlaege">
+    <div class="dialog-kopf">
+      <h2>Offene Kommentare und Vorschläge</h2>
+      <button class="btn btn-ghost btn-icon" type="button" data-close aria-label="Schließen">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
+      </button>
+    </div>
+    <p class="muted klein dialog-erklaerung">Übernehmen hängt eine Ergänzung an die Arbeitshilfe des Schritts an und speichert eine neue Version. Den Text kannst du vorher anpassen. Wer was prüft, regelt später das Rollenkonzept.</p>
+    <ul class="vorschlag-liste" id="vorschlag-liste"></ul>
   </dialog>
 
   <dialog class="dialog dialog-login" id="dialog-login">

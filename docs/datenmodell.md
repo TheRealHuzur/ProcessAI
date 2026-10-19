@@ -54,13 +54,33 @@ Namensraum `pp` = `https://prozesspilot.wissen-und-werkzeug.de/schema/wissen`, B
 
 Im KI-JSON heißt das Feld `wissen` (`dokumente`, `ansprechpersonen`, `rechtsgrundlagen`, je eine Liste). Es geht nie an die KI und wird bei Änderungen über die id übernommen.
 
+### kommentare (gebaut 19.10.2026, Migration 2)
+
+Kommentare und Ergänzungsvorschläge am Schritt (Schritte, Ereignisse, Gateways der gespeicherten Version).
+
+| Spalte | Typ | Bedeutung |
+|---|---|---|
+| id | TEXT | UUID |
+| prozess_id | TEXT | Verweis auf prozesse.id (wird mit dem Prozess gelöscht) |
+| element_id | TEXT | feste ID des BPMN-Elements |
+| element_name | TEXT | Name des Elements beim Eintragen |
+| art | TEXT | `kommentar` (Hinweis, Frage) oder `vorschlag` (Ergänzung zur Arbeitshilfe) |
+| text | TEXT | Inhalt; bei der Übernahme der endgültige, ggf. angepasste Text |
+| verfasst_von | TEXT | Name des Kontos |
+| status | TEXT | `offen`, `uebernommen` (nur Vorschlag), `erledigt` (nur Kommentar), `abgelehnt` |
+| entschieden_von | TEXT | Name des Kontos, das entschieden hat |
+| entschieden | TEXT | ISO-Zeitstempel der Entscheidung |
+| version_uebernommen | INTEGER | Version, in der ein Vorschlag in die Arbeitshilfe kam |
+| erstellt | TEXT | ISO-Zeitstempel |
+
+Ein übernommener Vorschlag wird an die Arbeitshilfe (`documentation`) des Elements angehängt; daraus entsteht eine neue Version. Eine Zuständigkeit je Rolle kommt mit dem Rollenkonzept.
+
 ## Vorgesehen für Version 2 und 3 (noch nicht angelegt)
 
 Alle hängen über `prozess_id` und, wo sinnvoll, `element_id` am Prozess.
 
 | Tabelle | Zweck |
 |---|---|
-| kommentare | Kommentare und Ergänzungsvorschläge am Schritt, mit Status (offen, freigegeben, abgelehnt) und kuratierender Rolle |
 | fragen | Fragen an den Chatbot, die nicht beantwortet werden konnten (Wissenslücken); kommt mit dem Chatbot (aus Version 1 verschoben am 18.10.2026) |
 | vorgaenge | konkrete Vorgänge, die per Checkliste durch einen Prozess laufen |
 | vorgang_schritte | Zeitstempel je Vorgang und Schritt (Heatmap, Durchlaufzeiten) |

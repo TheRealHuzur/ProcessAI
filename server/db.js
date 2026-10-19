@@ -25,7 +25,24 @@ const MIGRATIONEN = [
      erstellt TEXT NOT NULL,
      UNIQUE (prozess_id, version)
    );
-   CREATE INDEX idx_versionen_prozess ON prozess_versionen(prozess_id, version DESC);`
+   CREATE INDEX idx_versionen_prozess ON prozess_versionen(prozess_id, version DESC);`,
+  // Kommentare und Ergänzungsvorschläge am Schritt (Phase 8). element_name hält den Namen zum Zeitpunkt des Eintrags fest.
+  `CREATE TABLE kommentare (
+     id TEXT PRIMARY KEY,
+     prozess_id TEXT NOT NULL REFERENCES prozesse(id) ON DELETE CASCADE,
+     element_id TEXT NOT NULL,
+     element_name TEXT NOT NULL DEFAULT '',
+     art TEXT NOT NULL CHECK (art IN ('kommentar', 'vorschlag')),
+     text TEXT NOT NULL,
+     verfasst_von TEXT NOT NULL DEFAULT '',
+     status TEXT NOT NULL DEFAULT 'offen' CHECK (status IN ('offen', 'uebernommen', 'erledigt', 'abgelehnt')),
+     entschieden_von TEXT NOT NULL DEFAULT '',
+     entschieden TEXT,
+     version_uebernommen INTEGER,
+     erstellt TEXT NOT NULL
+   );
+   CREATE INDEX idx_kommentare_prozess ON kommentare(prozess_id, element_id);
+   CREATE INDEX idx_kommentare_status ON kommentare(status, erstellt);`
 ];
 
 export function oeffneDatenbank(dataDir) {
@@ -69,7 +86,18 @@ function createRepository(db) {
     neueVersion: db.prepare(`
       INSERT INTO prozess_versionen (id, prozess_id, version, bpmn_xml, quelltext, ki_modell, ki_json, pruefung_json, notiz, erstellt)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`),
-    loeschen: db.prepare("DELETE FROM prozesse WHERE id = ?")
+    loeschen: db.prepare("DELETE FROM prozesse WHERE id = ?"),
+    kommentareProzess: db.prepare("SELECT * FROM kommentare WHERE prozess_id = ? ORDER BY erstellt"),
+    kommentar: db.prepare("SELECT * FROM kommentare WHERE id = ?"),
+    offeneKommentare: db.prepare(`
+      SELECT k.*, p.name AS prozess_name FROM kommentare k JOIN prozesse p ON p.id = k.prozess_id
+      WHERE k.status = 'offen' ORDER BY k.erstellt`),
+    neuerKommentar: db.prepare(`
+      INSERT INTO kommentare (id, prozess_id, element_id, element_name, art, text, verfasst_von, erstellt)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`),
+    kommentarEntscheiden: db.prepare(`
+      UPDATE kommentare SET status = ?, text = ?, entschieden_von = ?, entschieden = ?, version_uebernommen = ?
+      WHERE id = ? AND status = 'offen'`)
   };
 
   return {
@@ -107,6 +135,30 @@ function createRepository(db) {
         db.exec("ROLLBACK");
         throw error;
       }
+    },
+
+    listeKommentare(prozessId) {
+      return stmts.kommentareProzess.all(prozessId);
+    },
+
+    holeKommentar(id) {
+      return stmts.kommentar.get(id) || null;
+    },
+
+    // Offene Kommentare und Vorschläge aller Prozesse, älteste zuerst
+    offeneKommentare() {
+      return stmts.offeneKommentare.all();
+    },
+
+    speichereKommentar({ prozessId, elementId, elementName = "", art, text, verfasstVon = "" }) {
+      const id = crypto.randomUUID();
+      stmts.neuerKommentar.run(id, prozessId, elementId, elementName, art, text, verfasstVon, jetzt());
+      return stmts.kommentar.get(id);
+    },
+
+    // Nur offene Einträge lassen sich entscheiden; false, wenn schon entschieden
+    entscheideKommentar(id, { status, text, entschiedenVon = "", versionUebernommen = null }) {
+      return stmts.kommentarEntscheiden.run(status, text, entschiedenVon, jetzt(), versionUebernommen, id).changes > 0;
     },
 
     loescheProzess(id) {
