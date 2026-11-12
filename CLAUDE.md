@@ -6,9 +6,9 @@ Prozess in normaler Sprache einsprechen oder eintippen, Knopf drücken, BPMN-2.0
 
 Die führende Projektdoku liegt außerhalb des Repos im eigenen Storage-Ordner `/srv/wuw-storage/50_coding/prozesspilot` (Patrick liest sie in Obsidian).
 
-- Bei neuem Chat zuerst `/srv/wuw-storage/50_coding/prozesspilot/00_ProzessPilot_START_HERE.md` lesen und seiner Leselogik folgen. Dort stehen die verbindlichen Regeln für die Programmierung, die Dokumentationspflicht und die Definition of Done.
+- Bei neuem Chat zuerst `/srv/wuw-storage/50_coding/prozesspilot/00_START_HERE.md` lesen und seiner Leselogik folgen. Dort stehen die verbindlichen Regeln für die Programmierung, die Dokumentationspflicht und die Definition of Done.
 - `ProzessPilot-Masterplan.md` im selben Ordner ist die Planungsdatei und der Stand des Projekts. Bei jeder Arbeit am Repo mitpflegen: Schritte abhaken, wenn sie umgesetzt sind, Phasenstatus und `stand` aktualisieren.
-- Nach jeder Änderung die Projektdoku dort nachziehen (mindestens Masterplan und `01_ProzessPilot_STATUS.md`).
+- Nach jeder Änderung die Projektdoku dort nachziehen (mindestens Masterplan und `STATUS.md`).
 - Keine Kopie des Masterplans oder der Projektdoku im Repo. Diese Doku hier und `docs/` sind technisch ergänzend; `docs/planung.md` ist die Ideen- und Detailsammlung.
 
 ## Harte Regeln (Kurzfassung, vollständig im Start Here)
@@ -30,4 +30,4 @@ node --env-file=.env --no-warnings=ExperimentalWarning server/index.js
 npm test
 ```
 
-Die App braucht Node ab 22.13. Auf dem Server (Node 18) im Container testen, Befehl in `03_ProzessPilot_BETRIEB.md`.
+Die App braucht Node ab 22.13. Auf dem Server (Node 18) im Container testen, Befehl in `BETRIEB.md`.
