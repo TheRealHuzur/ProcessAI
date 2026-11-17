@@ -19,6 +19,17 @@ Datenbank: SQLite (in Node eingebaut, `node:sqlite`), Datei unter `DATA_DIR` (St
 | name | TEXT | Prozessname |
 | erstellt | TEXT | ISO-Zeitstempel |
 | geaendert | TEXT | ISO-Zeitstempel der letzten Version |
+| arbeitsbereich_id | TEXT | Verweis auf arbeitsbereiche.id (seit Migration 3) |
+
+### arbeitsbereiche (gebaut 17.11.2026, Migration 3)
+
+Jeder Prozess gehört zu genau einem Arbeitsbereich. Die Migration legt „Allgemein“ (id `allgemein`) an und ordnet alle vorhandenen Prozesse dort ein. Neue Prozesse ohne Angabe landen dort. Speichern einer neuen Version verschiebt nicht; verschoben wird nur ausdrücklich (`PATCH /api/prozesse/:id`).
+
+| Spalte | Typ | Bedeutung |
+|---|---|---|
+| id | TEXT | UUID, beim Startbereich `allgemein` |
+| name | TEXT | Name, eindeutig ohne Rücksicht auf Groß- und Kleinschreibung, höchstens 60 Zeichen |
+| erstellt | TEXT | ISO-Zeitstempel |
 
 ### prozess_versionen
 

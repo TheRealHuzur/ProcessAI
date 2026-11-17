@@ -33,6 +33,27 @@ button { font: inherit; cursor: pointer; }
 [hidden] { display: none !important; }
 
 .chat-shell { display: flex; height: 100vh; }
+.chat-shell.seite-zu .seite { display: none; }
+
+/* Knopf zum Ein- und Ausklappen der Seitenleiste */
+.klapp {
+  margin-left: auto;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: none;
+  color: var(--text-muted);
+}
+.klapp:hover { background: var(--surface-2); border-color: var(--border); color: var(--sky-dark); }
+.klapp svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.haupt-kopf { display: flex; align-items: center; gap: 10px; max-width: 760px; margin: -14px auto 14px; }
+.haupt-kopf .klapp { margin-left: 0; background: var(--surface); border-color: var(--border); }
+.aktueller-prozess { min-width: 0; font-size: 14px; font-weight: 600; color: var(--text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 
 /* Linke Seite */
 .seite {
@@ -45,12 +66,12 @@ button { font: inherit; cursor: pointer; }
   background: var(--surface);
   border-right: 1px solid var(--border);
 }
-.seite-kopf { display: flex; align-items: baseline; gap: 8px; }
+.seite-kopf { display: flex; align-items: center; gap: 8px; }
 .marke { font-size: 19px; font-weight: 600; letter-spacing: -0.02em; text-decoration: none; }
 .marke-dunkel { color: var(--text); }
 .marke-hell { color: var(--sky); }
 .marke-zusatz { padding: 2px 8px; border-radius: 999px; font-size: 11px; color: var(--accent); background: rgba(14, 151, 173, 0.10); }
-.seite-titel { margin: 6px 0 0; font-size: 12px; font-weight: 600; color: var(--text-muted); }
+.seite-titel { display: block; margin: 6px 0 0; font-size: 12px; font-weight: 600; color: var(--text-muted); }
 
 .prozesse { list-style: none; margin: 0; padding: 0; flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
 .prozess {

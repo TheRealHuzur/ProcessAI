@@ -137,8 +137,31 @@ export function erstelleApp({ db, llm, sprache = verschrifte } = {}) {
     }
   });
 
+  // Arbeitsbereiche: Prozesse gruppieren; ?arbeitsbereich=<id> begrenzt Listen auf einen Bereich
+  app.get("/api/arbeitsbereiche", (req, res) => {
+    res.json(db.listeArbeitsbereiche());
+  });
+
+  app.post("/api/arbeitsbereiche", (req, res) => {
+    const name = bereichsName((req.body || {}).name);
+    if (!name) return res.status(400).json({ fehler: `Bitte einen Namen mit höchstens ${MAX_BEREICH_NAME} Zeichen eingeben.` });
+    const bereich = db.legeArbeitsbereichAn(name);
+    if (!bereich) return res.status(409).json({ fehler: `Den Arbeitsbereich "${name}" gibt es schon.` });
+    return res.json(bereich);
+  });
+
+  app.patch("/api/arbeitsbereiche/:id", (req, res) => {
+    const name = bereichsName((req.body || {}).name);
+    if (!name) return res.status(400).json({ fehler: `Bitte einen Namen mit höchstens ${MAX_BEREICH_NAME} Zeichen eingeben.` });
+    const ergebnis = db.benenneArbeitsbereichUm(req.params.id, name);
+    if (ergebnis === "fehlt") return res.status(404).json({ fehler: "Arbeitsbereich nicht gefunden." });
+    if (ergebnis === "doppelt") return res.status(409).json({ fehler: `Den Arbeitsbereich "${name}" gibt es schon.` });
+    return res.json(ergebnis);
+  });
+
   app.get("/api/prozesse", (req, res) => {
-    res.json(db.listeProzesse());
+    const arbeitsbereichId = req.query.arbeitsbereich ? String(req.query.arbeitsbereich) : null;
+    res.json(db.listeProzesse({ arbeitsbereichId }));
   });
 
   app.get("/api/prozesse/:id", (req, res) => {
@@ -153,9 +176,14 @@ export function erstelleApp({ db, llm, sprache = verschrifte } = {}) {
     if (!bpmnXml.includes("bpmn:definitions") && !bpmnXml.includes("definitions")) {
       return res.status(400).json({ fehler: "Kein gültiges BPMN-XML übergeben." });
     }
+    const arbeitsbereichId = body.arbeitsbereichId ? String(body.arbeitsbereichId) : null;
+    if (arbeitsbereichId && !db.holeArbeitsbereich(arbeitsbereichId)) {
+      return res.status(400).json({ fehler: "Den gewählten Arbeitsbereich gibt es nicht mehr. Bitte neu wählen." });
+    }
     const gespeichert = db.speichereVersion({
       prozessId: body.prozessId ? String(body.prozessId) : null,
       name: String(body.name || "").trim() || "Neuer Prozess",
+      arbeitsbereichId,
       bpmnXml,
       quelltext: String(body.quelltext || ""),
       kiModell: String(body.kiModell || ""),
@@ -164,6 +192,14 @@ export function erstelleApp({ db, llm, sprache = verschrifte } = {}) {
       notiz: String(body.notiz || "")
     });
     res.json(gespeichert);
+  });
+
+  // Prozess einem anderen Arbeitsbereich zuordnen
+  app.patch("/api/prozesse/:id", (req, res) => {
+    const arbeitsbereichId = String((req.body || {}).arbeitsbereichId || "");
+    if (!db.holeArbeitsbereich(arbeitsbereichId)) return res.status(400).json({ fehler: "Arbeitsbereich nicht gefunden." });
+    if (!db.verschiebeProzess(req.params.id, arbeitsbereichId)) return res.status(404).json({ fehler: "Prozess nicht gefunden." });
+    return res.json({ ok: true, arbeitsbereichId });
   });
 
   app.delete("/api/prozesse/:id", (req, res) => {
@@ -192,9 +228,10 @@ export function erstelleApp({ db, llm, sprache = verschrifte } = {}) {
     }
   });
 
-  // Offene Einträge aller Prozesse für die Vorschlagsliste
+  // Offene Einträge für die Vorschlagsliste, mit ?arbeitsbereich=<id> nur aus diesem Bereich
   app.get("/api/kommentare/offen", (req, res) => {
-    res.json(db.offeneKommentare());
+    const arbeitsbereichId = req.query.arbeitsbereich ? String(req.query.arbeitsbereich) : null;
+    res.json(db.offeneKommentare({ arbeitsbereichId }));
   });
 
   app.post("/api/kommentare/:id/entscheiden", async (req, res) => {
@@ -249,6 +286,14 @@ export function erstelleApp({ db, llm, sprache = verschrifte } = {}) {
   app.use((req, res) => res.status(404).sendFile(path.join(ROOT_DIR, "public", "index.html")));
 
   return app;
+}
+
+const MAX_BEREICH_NAME = 60;
+
+// Bereinigter Name eines Arbeitsbereichs oder "" bei leerem oder zu langem Namen
+function bereichsName(wert) {
+  const name = String(wert || "").replace(/\s+/g, " ").trim();
+  return name.length > 0 && name.length <= MAX_BEREICH_NAME ? name : "";
 }
 
 function kommentarFehler(res, error) {

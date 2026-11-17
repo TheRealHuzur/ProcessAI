@@ -21,7 +21,8 @@ const ANWEISUNGEN = `ProzessPilot macht aus Prozessbeschreibungen BPMN-2.0-Model
 Regeln: Rollen statt Personennamen. Nichts erfinden und nichts weglassen; Unklares gehört als Frage in "unklarheiten". Nur die Elemente des Basis-Levels.
 Jede Speicherung ist eine neue Version, alte Versionen bleiben erhalten (version_wiederherstellen). Nur prozess_loeschen entfernt einen Prozess endgültig mit allen Versionen.
 Zwei Wege zum Modell: prozess_erzeugen und prozess_aendern lassen die KI der App arbeiten. modell_speichern nimmt ein Modell, das du selbst baust; lies dafür vorher anleitung_lesen.
-Vor jeder Änderung prozess_lesen. modell_speichern und prozess_aendern ordnen das Diagramm neu an. arbeitshilfen_setzen ändert nur die Angaben an Schritten und lässt die Anordnung stehen.`;
+Vor jeder Änderung prozess_lesen. modell_speichern und prozess_aendern ordnen das Diagramm neu an. arbeitshilfen_setzen ändert nur die Angaben an Schritten und lässt die Anordnung stehen.
+Prozesse liegen in Arbeitsbereichen (arbeitsbereiche_auflisten). Neue Prozesse ohne arbeitsbereich_id landen im Bereich "Allgemein".`;
 
 export class WerkzeugFehler extends Error {}
 
@@ -137,6 +138,14 @@ function pruefungAus(ergebnis) {
   return { fehler: [...ergebnis.probleme, ...ergebnis.pruefung.fehler], hinweise: ergebnis.pruefung.hinweise };
 }
 
+// id eines vorhandenen Arbeitsbereichs oder null ohne Angabe
+function bereichAus(db, wert) {
+  const id = textAus(wert);
+  if (!id) return null;
+  if (!db.holeArbeitsbereich(id)) throw new WerkzeugFehler(`Arbeitsbereich "${id}" nicht gefunden. arbeitsbereiche_auflisten zeigt alle Bereiche.`);
+  return id;
+}
+
 function aenderungKurz(vergleich) {
   if (!vergleich) return undefined;
   const { neu, geaendert, entfernt, unveraendert } = vergleich;
@@ -150,6 +159,7 @@ const SCHREIBEN = { readOnlyHint: false, destructiveHint: false, idempotentHint:
 
 const PROZESS_ID = { type: "string", description: "id des Prozesses aus prozesse_auflisten" };
 const VERSION = { type: "integer", minimum: 1, description: "Versionsnummer; ohne Angabe die neueste" };
+const BEREICH_NEU = { type: "string", description: "id aus arbeitsbereiche_auflisten; gilt nur für einen neuen Prozess, ohne Angabe \"Allgemein\"" };
 const NOTIZ = { type: "string", description: "Kurze Notiz zur Version, erscheint in der Versionsliste" };
 const VERLUSTE = { type: "boolean", description: "Nur nötig, wenn prozess_lesen Abweichungen meldet (z. B. Inhalt aufgeklappter Teilprozesse, fremde Elemente). true nimmt den Verlust in Kauf." };
 const ANGABEN_LISTE = (titel) => ({ type: "array", items: { type: "string" }, description: `${titel}, ein Eintrag je Angabe. Ersetzt die bisherige Liste; [] leert sie.` });
@@ -176,12 +186,20 @@ Unten steht die Anleitung, die auch die KI der App bekommt. Für dich gilt sie m
 ${systemPrompt()}`
     },
     {
-      name: "prozesse_auflisten",
-      title: "Prozesse auflisten",
-      description: "Alle gespeicherten Prozesse mit id, Name, neuester Versionsnummer und Zeitpunkten, zuletzt geänderte zuerst.",
+      name: "arbeitsbereiche_auflisten",
+      title: "Arbeitsbereiche auflisten",
+      description: "Alle Arbeitsbereiche mit id, Name und Zahl der Prozesse. Jeder Prozess gehört zu genau einem Bereich.",
       inputSchema: { type: "object", properties: {} },
       annotations: NUR_LESEN,
-      run: async () => ({ prozesse: db.listeProzesse() })
+      run: async () => ({ arbeitsbereiche: db.listeArbeitsbereiche() })
+    },
+    {
+      name: "prozesse_auflisten",
+      title: "Prozesse auflisten",
+      description: "Gespeicherte Prozesse mit id, Name, Arbeitsbereich, neuester Versionsnummer und Zeitpunkten, zuletzt geänderte zuerst. Mit arbeitsbereich_id nur die Prozesse dieses Bereichs.",
+      inputSchema: { type: "object", properties: { arbeitsbereich_id: { type: "string", description: "id aus arbeitsbereiche_auflisten; ohne Angabe alle Prozesse" } } },
+      annotations: NUR_LESEN,
+      run: async (args) => ({ prozesse: db.listeProzesse({ arbeitsbereichId: bereichAus(db, args.arbeitsbereich_id) }) })
     },
     {
       name: "prozess_lesen",
@@ -200,6 +218,8 @@ ${systemPrompt()}`
         return {
           prozess_id: prozess.id,
           name: prozess.name,
+          arbeitsbereich_id: prozess.arbeitsbereich_id,
+          arbeitsbereich: db.holeArbeitsbereich(prozess.arbeitsbereich_id)?.name || "",
           version: stand.version,
           neueste_version: prozess.aktuell?.version ?? stand.version,
           gespeichert: stand.erstellt,
@@ -223,7 +243,8 @@ ${systemPrompt()}`
         properties: {
           text: { type: "string", description: `Prozessbeschreibung in normaler Sprache, 20 bis ${config.maxTextLength} Zeichen` },
           prozessname: { type: "string", description: "Name des Prozesses; ohne Angabe benennt die KI ihn" },
-          ki_modell: { type: "string", description: "id aus ki_modelle_auflisten; ohne Angabe das Standardmodell der App" }
+          ki_modell: { type: "string", description: "id aus ki_modelle_auflisten; ohne Angabe das Standardmodell der App" },
+          arbeitsbereich_id: BEREICH_NEU
         },
         required: ["text"]
       },
@@ -234,12 +255,14 @@ ${systemPrompt()}`
         if (text.length < 20) throw new WerkzeugFehler("Die Prozessbeschreibung ist zu kurz.");
         if (text.length > config.maxTextLength) throw new WerkzeugFehler(`Die Prozessbeschreibung ist zu lang (höchstens ${config.maxTextLength} Zeichen).`);
         const model = waehleKiModell(args.ki_modell);
+        const arbeitsbereichId = bereichAus(db, args.arbeitsbereich_id);
         const beginn = Date.now();
         const ergebnis = await erzeugeModell({ text, prozessname, model, ...llmOption });
         const name = prozessname || ergebnis.prozessname || "Neuer Prozess";
         const gespeichert = db.speichereVersion({
           prozessId: null,
           name,
+          arbeitsbereichId,
           bpmnXml: ergebnis.xml,
           quelltext: text,
           kiModell: model.id,
@@ -319,6 +342,7 @@ ${systemPrompt()}`
           modell: { type: "object", description: "Prozessmodell mit prozessname, pool, rollen, externe, elemente, fluesse, nachrichten, daten, unklarheiten, nicht_modelliert", additionalProperties: true },
           prozess_id: { type: "string", description: "Bestehender Prozess; ohne Angabe wird ein neuer angelegt" },
           name: { type: "string", description: "Name des Prozesses in der Liste; ohne Angabe bleibt der bisherige bzw. gilt prozessname" },
+          arbeitsbereich_id: BEREICH_NEU,
           notiz: NOTIZ,
           nur_pruefen: { type: "boolean", description: "true: nur prüfen und Unterschiede zeigen, nichts speichern" },
           verluste_akzeptieren: VERLUSTE
@@ -328,6 +352,7 @@ ${systemPrompt()}`
       annotations: SCHREIBEN,
       run: async (args) => {
         let roh = modellAusEingabe(args.modell);
+        const arbeitsbereichId = bereichAus(db, args.arbeitsbereich_id);
         let vorher = null;
         if (textAus(args.prozess_id)) {
           vorher = ladeStand(db, args.prozess_id);
@@ -347,6 +372,7 @@ ${systemPrompt()}`
         const gespeichert = db.speichereVersion({
           prozessId: vorher?.prozess.id || null,
           name: textAus(args.name) || vorher?.prozess.name || ergebnis.modell.prozessname,
+          arbeitsbereichId,
           bpmnXml: zuXml(ergebnis.modell),
           quelltext: vorher?.stand.quelltext || "",
           kiModell: QUELLE,
@@ -432,12 +458,13 @@ ${systemPrompt()}`
       description: "Speichert ein BPMN-2.0-XML unverändert, etwa aus einem anderen Werkzeug oder von Hand bearbeitet: ohne prozess_id als neuen Prozess, sonst als neue Version. Meldet, was nicht zum Basis-Level gehört.",
       inputSchema: {
         type: "object",
-        properties: { bpmn_xml: { type: "string", description: "Vollständiges BPMN-2.0-XML" }, prozess_id: { type: "string", description: "Bestehender Prozess; ohne Angabe ein neuer" }, name: { type: "string" }, notiz: NOTIZ },
+        properties: { bpmn_xml: { type: "string", description: "Vollständiges BPMN-2.0-XML" }, prozess_id: { type: "string", description: "Bestehender Prozess; ohne Angabe ein neuer" }, name: { type: "string" }, arbeitsbereich_id: BEREICH_NEU, notiz: NOTIZ },
         required: ["bpmn_xml"]
       },
       annotations: SCHREIBEN,
       run: async (args) => {
         const bpmnXml = String(args.bpmn_xml || "");
+        const arbeitsbereichId = bereichAus(db, args.arbeitsbereich_id);
         let gelesen;
         try {
           gelesen = await leseModellAusXml(bpmnXml);
@@ -449,6 +476,7 @@ ${systemPrompt()}`
         const gespeichert = db.speichereVersion({
           prozessId: vorher?.prozess.id || null,
           name: textAus(args.name) || vorher?.prozess.name || gelesen.modell.prozessname || "Neuer Prozess",
+          arbeitsbereichId,
           bpmnXml,
           quelltext: vorher?.stand.quelltext || "",
           notiz: textAus(args.notiz) || "XML über Claude Desktop gespeichert"

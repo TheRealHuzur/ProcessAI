@@ -15,9 +15,15 @@
 <body>
   <div class="app-shell">
     <header class="site-header">
-      <div class="brand" aria-label="ProzessPilot">
-        <span class="brand-dark">Prozess</span><span class="brand-accent">Pilot</span>
-        <span class="brand-badge">Entwurf 0.1</span>
+      <div class="kopf-links">
+        <div class="brand" aria-label="ProzessPilot">
+          <span class="brand-dark">Prozess</span><span class="brand-accent">Pilot</span>
+          <span class="brand-badge">Entwurf 0.1</span>
+        </div>
+        <label class="bereich-wahl" title="Arbeitsbereich: Meine Prozesse und Vorschläge zeigen nur diesen Bereich, neue Prozesse landen hier">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>
+          <select id="arbeitsbereich" aria-label="Arbeitsbereich"></select>
+        </label>
       </div>
       <div class="toolbar" aria-label="Werkzeugleiste">
         <button class="btn btn-secondary" id="btn-prozesse" type="button">
@@ -48,7 +54,7 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h9a3 3 0 0 1 3 3v13H8a3 3 0 0 1-3-3z"></path><path d="M5 17a3 3 0 0 1 3-3h9"></path></svg>
           <span class="btn-label">Handbuch</span>
         </button>
-        <button class="btn btn-secondary" id="btn-vorschlaege" type="button" title="Offene Kommentare und Vorschläge aller Prozesse">
+        <button class="btn btn-secondary" id="btn-vorschlaege" type="button" title="Offene Kommentare und Vorschläge im Arbeitsbereich">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5h14v10H9l-4 4z"></path></svg>
           <span class="btn-label">Vorschläge</span>
           <span class="zaehler-badge" id="vorschlaege-zahl" hidden></span>
@@ -194,6 +200,11 @@
       <button class="btn btn-ghost btn-icon" type="button" data-close aria-label="Schließen">
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"></path></svg>
       </button>
+    </div>
+    <div class="bereich-leiste">
+      <span class="bereich-titel"><span class="muted">Arbeitsbereich</span> <strong id="dialog-bereich-name"></strong></span>
+      <button class="btn btn-ghost btn-klein" id="btn-bereich-umbenennen" type="button">Umbenennen</button>
+      <button class="btn btn-secondary btn-klein" id="btn-bereich-neu" type="button">Neuer Arbeitsbereich</button>
     </div>
     <ul class="prozess-liste" id="prozess-liste"></ul>
   </dialog>

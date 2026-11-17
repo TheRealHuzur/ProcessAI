@@ -96,7 +96,7 @@ test("Initialisierung, Benachrichtigung und Werkzeugliste", async () => {
 
   const { json } = await mcp({ jsonrpc: "2.0", id: 3, method: "tools/list" });
   const namen = json.result.tools.map((t) => t.name);
-  for (const name of ["anleitung_lesen", "prozesse_auflisten", "prozess_lesen", "prozess_erzeugen", "prozess_aendern", "modell_speichern", "arbeitshilfen_setzen", "bpmn_xml_speichern", "version_wiederherstellen", "prozess_loeschen", "handbuch_link", "ki_modelle_auflisten"]) {
+  for (const name of ["anleitung_lesen", "arbeitsbereiche_auflisten", "prozesse_auflisten", "prozess_lesen", "prozess_erzeugen", "prozess_aendern", "modell_speichern", "arbeitshilfen_setzen", "bpmn_xml_speichern", "version_wiederherstellen", "prozess_loeschen", "handbuch_link", "ki_modelle_auflisten"]) {
     assert.ok(namen.includes(name), name);
   }
   for (const t of json.result.tools) {

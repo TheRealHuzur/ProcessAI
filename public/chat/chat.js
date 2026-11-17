@@ -4,6 +4,12 @@
 
   const $ = (id) => document.getElementById(id);
   const el = {
+    shell: document.querySelector(".chat-shell"),
+    seiteZu: $("seite-zu"),
+    seiteAuf: $("seite-auf"),
+    hauptKopf: $("haupt-kopf"),
+    aktuellerProzess: $("aktueller-prozess"),
+    arbeitsbereich: $("arbeitsbereich"),
     suche: $("suche"),
     prozesse: $("prozesse"),
     modell: $("modell"),
@@ -16,6 +22,9 @@
 
   const state = {
     prozesse: [],
+    bereiche: [],
+    // Aktiver Arbeitsbereich, gemeinsam mit dem Editor gemerkt; links stehen nur seine Prozesse
+    bereich: null,
     gewaehlt: null,
     // Verlauf je Prozess, nur in diesem Fenster; die letzten Einträge gehen als Zusammenhang mit
     verlaeufe: new Map(),
@@ -70,13 +79,18 @@
 
   // ---------- Prozesse links ----------
 
+  function prozesseImBereich() {
+    return state.prozesse.filter((p) => !state.bereich || p.arbeitsbereich_id === state.bereich);
+  }
+
   function zeigeProzesse() {
     const suche = el.suche.value.trim().toLowerCase();
-    const liste = state.prozesse.filter((p) => !suche || p.name.toLowerCase().includes(suche));
+    const imBereich = prozesseImBereich();
+    const liste = imBereich.filter((p) => !suche || p.name.toLowerCase().includes(suche));
     if (liste.length === 0) {
       const li = document.createElement("li");
       li.className = "prozesse-leer";
-      li.textContent = state.prozesse.length ? "Kein Prozess passt zur Suche." : "Noch keine Prozesse gespeichert.";
+      li.textContent = imBereich.length ? "Kein Prozess passt zur Suche." : "In diesem Arbeitsbereich sind noch keine Prozesse gespeichert.";
       el.prozesse.replaceChildren(li);
       return;
     }
@@ -99,7 +113,7 @@
 
   function waehle(id) {
     state.gewaehlt = id;
-    schreiben("pp.chat.prozess", id);
+    if (id) schreiben("pp.chat.prozess", id);
     zeigeProzesse();
     zeigeVerlauf();
     zeigeStatus("");
@@ -110,9 +124,51 @@
     return state.prozesse.find((p) => p.id === state.gewaehlt) || null;
   }
 
+  // ---------- Arbeitsbereich ----------
+
+  function zeigeBereiche() {
+    el.arbeitsbereich.replaceChildren(...state.bereiche.map((b) => {
+      const o = document.createElement("option");
+      o.value = b.id;
+      o.textContent = b.name;
+      return o;
+    }));
+    if (state.bereich) el.arbeitsbereich.value = state.bereich;
+  }
+
+  // Wechselt den Bereich; liegt der gewählte Prozess nicht darin, gilt der erste des Bereichs
+  function waehleBereich(id) {
+    state.bereich = id;
+    schreiben("pp.arbeitsbereich", id);
+    el.suche.value = "";
+    const imBereich = prozesseImBereich();
+    if (!imBereich.some((p) => p.id === state.gewaehlt)) state.gewaehlt = (imBereich[0] && imBereich[0].id) || null;
+    if (state.gewaehlt) schreiben("pp.chat.prozess", state.gewaehlt);
+    zeigeProzesse();
+    zeigeVerlauf();
+  }
+
+  // ---------- Seitenleiste ein- und ausklappen ----------
+
+  // Zugeklappt zeigt der Chat nur den gewählten Prozess, etwa zum Vorführen
+  function setzeSeiteZu(zu) {
+    el.shell.classList.toggle("seite-zu", zu);
+    el.hauptKopf.hidden = !zu;
+    el.seiteZu.setAttribute("aria-expanded", String(!zu));
+    el.seiteAuf.setAttribute("aria-expanded", String(!zu));
+    schreiben("pp.chat.seiteZu", zu ? "1" : "");
+    zeigeAktuellenProzess();
+  }
+
+  function zeigeAktuellenProzess() {
+    const prozess = gewaehlterProzess();
+    el.aktuellerProzess.textContent = prozess ? prozess.name : "";
+  }
+
   // ---------- Antworten ----------
 
   function zeigeVerlauf() {
+    zeigeAktuellenProzess();
     const prozess = gewaehlterProzess();
     const verlauf = state.verlaeufe.get(state.gewaehlt) || [];
     if (!prozess || verlauf.length === 0) {
@@ -120,7 +176,7 @@
       p.className = "antworten-leer";
       p.textContent = prozess
         ? `Frag etwas zu „${prozess.name}“. Die Antwort kommt nur aus dem, was im Modell und in den Arbeitshilfen steht.`
-        : "Wähle links einen Prozess aus.";
+        : el.shell.classList.contains("seite-zu") ? "Klapp die Seitenleiste aus und wähle einen Prozess." : "Wähle links einen Prozess aus.";
       el.antworten.replaceChildren(p);
       return;
     }
@@ -243,11 +299,25 @@
     });
     el.frage.addEventListener("input", passeHoeheAn);
     el.suche.addEventListener("input", zeigeProzesse);
+    el.arbeitsbereich.addEventListener("change", () => waehleBereich(el.arbeitsbereich.value));
+    el.seiteZu.addEventListener("click", () => {
+      setzeSeiteZu(true);
+      el.seiteAuf.focus();
+    });
+    el.seiteAuf.addEventListener("click", () => {
+      setzeSeiteZu(false);
+      el.seiteZu.focus();
+    });
+    setzeSeiteZu(lesen("pp.chat.seiteZu") === "1");
     el.modell.addEventListener("change", () => schreiben("pp.chat.modell", el.modell.value));
 
     try {
-      const [prozesse, modelle] = await Promise.all([api("/api/prozesse"), api("/api/chat/modelle")]);
+      const [prozesse, modelle, bereiche] = await Promise.all([api("/api/prozesse"), api("/api/chat/modelle"), api("/api/arbeitsbereiche")]);
       state.prozesse = prozesse;
+      state.bereiche = bereiche;
+      const gemerkterBereich = lesen("pp.arbeitsbereich");
+      state.bereich = bereiche.some((b) => b.id === gemerkterBereich) ? gemerkterBereich : (bereiche[0] && bereiche[0].id) || null;
+      zeigeBereiche();
       el.modell.replaceChildren(...modelle.map((m) => {
         const o = document.createElement("option");
         o.value = m.id;
@@ -257,7 +327,8 @@
       const modell = lesen("pp.chat.modell");
       if (modelle.some((m) => m.id === modell)) el.modell.value = modell;
       const gemerkt = lesen("pp.chat.prozess");
-      state.gewaehlt = prozesse.some((p) => p.id === gemerkt) ? gemerkt : (prozesse[0] && prozesse[0].id) || null;
+      const imBereich = prozesseImBereich();
+      state.gewaehlt = imBereich.some((p) => p.id === gemerkt) ? gemerkt : (imBereich[0] && imBereich[0].id) || null;
       zeigeProzesse();
       zeigeVerlauf();
       el.frage.focus();

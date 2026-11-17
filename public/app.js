@@ -55,7 +55,9 @@
     kommentarText: $("kommentar-text"),
     dialogVorschlaege: $("dialog-vorschlaege"),
     vorschlagListe: $("vorschlag-liste"),
-    vorschlaegeZahl: $("vorschlaege-zahl")
+    vorschlaegeZahl: $("vorschlaege-zahl"),
+    arbeitsbereich: $("arbeitsbereich"),
+    dialogBereichName: $("dialog-bereich-name")
   };
 
   const LEER_XML = `<?xml version="1.0" encoding="UTF-8"?>
@@ -115,7 +117,10 @@
     sprache: null,
     // Kommentare und Vorschläge des gespeicherten Prozesses (kommentareFuer: dessen id)
     kommentare: [],
-    kommentareFuer: null
+    kommentareFuer: null,
+    // Arbeitsbereiche; bereich ist der aktive, er begrenzt Prozessliste und Vorschläge
+    bereiche: [],
+    bereich: null
   };
 
   // Aufruf aus dem Chat (?prozess=…&element=…) oder Rückweg nach der Anmeldung (?weiter=chat)
@@ -727,7 +732,7 @@
 
   async function aktualisiereVorschlagZahl() {
     try {
-      setzeVorschlagZahl((await api("/api/kommentare/offen")).length);
+      setzeVorschlagZahl((await api(offenePfad())).length);
     } catch {
       /* Zahl bleibt stehen */
     }
@@ -739,10 +744,10 @@
       el.dialogVorschlaege.showModal();
     }
     try {
-      const liste = await api("/api/kommentare/offen");
+      const liste = await api(offenePfad());
       setzeVorschlagZahl(liste.length);
       if (liste.length === 0) {
-        el.vorschlagListe.innerHTML = `<li class="prozess-leer">Nichts offen.</li>`;
+        el.vorschlagListe.innerHTML = `<li class="prozess-leer">Im Arbeitsbereich „${bereichsName()}“ ist nichts offen.</li>`;
         return;
       }
       el.vorschlagListe.replaceChildren(...liste.map((k) => kommentarEintrag(k, { imDialog: true })));
@@ -750,6 +755,10 @@
       el.vorschlagListe.innerHTML = "";
       if (error.status !== 401) toast(error.message, "error");
     }
+  }
+
+  function offenePfad() {
+    return state.bereich ? `/api/kommentare/offen?arbeitsbereich=${encodeURIComponent(state.bereich)}` : "/api/kommentare/offen";
   }
 
   async function zumSchritt(k) {
@@ -1049,6 +1058,7 @@
         name: el.prozessname.value.trim() || "Neuer Prozess",
         bpmnXml,
         quelltext: el.quelltext.value,
+        arbeitsbereichId: state.bereich,
         notiz: state.befehle.length ? `Geändert per Anweisung: ${state.befehle.join(" | ")}` : "",
         ...(state.letzteErzeugung || {})
       };
@@ -1084,6 +1094,8 @@
         entwurfSichern();
       }
       speicherSchreiben("pp.prozessId", prozess.id);
+      // Ein Prozess aus einem anderen Bereich (Chat-Link, letzte Sitzung) macht seinen Bereich zum aktiven
+      if (prozess.arbeitsbereich_id && prozess.arbeitsbereich_id !== state.bereich) waehleBereich(prozess.arbeitsbereich_id);
       el.ergebnis.hidden = true;
       setDirty(false);
       await ladeKommentare();
@@ -1104,13 +1116,102 @@
     }
   }
 
+  // ---------- Arbeitsbereiche ----------
+
+  function bereichsName(id = state.bereich) {
+    const b = state.bereiche.find((x) => x.id === id);
+    return b ? b.name : "";
+  }
+
+  function zeigeBereiche() {
+    el.arbeitsbereich.replaceChildren(...state.bereiche.map((b) => {
+      const o = document.createElement("option");
+      o.value = b.id;
+      o.textContent = b.name;
+      return o;
+    }));
+    if (state.bereich) el.arbeitsbereich.value = state.bereich;
+    el.dialogBereichName.textContent = bereichsName();
+  }
+
+  async function ladeBereiche() {
+    state.bereiche = await api("/api/arbeitsbereiche");
+    const gemerkt = state.bereich || speicherLesen("pp.arbeitsbereich");
+    state.bereich = state.bereiche.some((b) => b.id === gemerkt) ? gemerkt : (state.bereiche[0] && state.bereiche[0].id) || null;
+    zeigeBereiche();
+  }
+
+  function waehleBereich(id) {
+    if (!state.bereiche.some((b) => b.id === id)) return;
+    state.bereich = id;
+    speicherSchreiben("pp.arbeitsbereich", id);
+    zeigeBereiche();
+    aktualisiereVorschlagZahl();
+  }
+
+  async function bereichAnlegen() {
+    const name = window.prompt("Name des neuen Arbeitsbereichs:");
+    if (!name || !name.trim()) return;
+    try {
+      const bereich = await api("/api/arbeitsbereiche", { method: "POST", body: { name } });
+      await ladeBereiche();
+      waehleBereich(bereich.id);
+      toast(`Arbeitsbereich „${bereich.name}“ angelegt. Neue Prozesse landen jetzt dort.`, "ok");
+      if (el.dialogProzesse.open) zeigeProzesse();
+    } catch (error) {
+      if (error.status !== 401) toast(error.message, "error");
+    }
+  }
+
+  async function bereichUmbenennen() {
+    const alt = bereichsName();
+    const name = window.prompt(`Neuer Name für „${alt}“:`, alt);
+    if (!name || !name.trim() || name.trim() === alt) return;
+    try {
+      await api(`/api/arbeitsbereiche/${encodeURIComponent(state.bereich)}`, { method: "PATCH", body: { name } });
+      await ladeBereiche();
+    } catch (error) {
+      if (error.status !== 401) toast(error.message, "error");
+    }
+  }
+
+  // Auswahl am Prozess in der Liste, um ihn einem anderen Bereich zuzuordnen
+  function verschiebenAuswahl(p) {
+    const auswahl = document.createElement("select");
+    auswahl.className = "bereich-verschieben";
+    auswahl.title = "In einen anderen Arbeitsbereich verschieben";
+    auswahl.setAttribute("aria-label", `Arbeitsbereich von ${p.name}`);
+    auswahl.replaceChildren(...state.bereiche.map((b) => {
+      const o = document.createElement("option");
+      o.value = b.id;
+      o.textContent = b.id === p.arbeitsbereich_id ? b.name : `nach ${b.name}`;
+      return o;
+    }));
+    auswahl.value = p.arbeitsbereich_id;
+    auswahl.addEventListener("change", async () => {
+      const ziel = auswahl.value;
+      try {
+        await api(`/api/prozesse/${encodeURIComponent(p.id)}`, { method: "PATCH", body: { arbeitsbereichId: ziel } });
+        toast(`„${p.name}“ liegt jetzt in „${bereichsName(ziel)}“.`, "ok");
+        await ladeBereiche();
+        aktualisiereVorschlagZahl();
+        zeigeProzesse();
+      } catch (error) {
+        auswahl.value = p.arbeitsbereich_id;
+        if (error.status !== 401) toast(error.message, "error");
+      }
+    });
+    return auswahl;
+  }
+
   async function zeigeProzesse() {
     el.prozessListe.innerHTML = `<li class="prozess-leer">Wird geladen …</li>`;
     if (!el.dialogProzesse.open) el.dialogProzesse.showModal();
     try {
-      const liste = await api("/api/prozesse");
+      await ladeBereiche();
+      const liste = await api(state.bereich ? `/api/prozesse?arbeitsbereich=${encodeURIComponent(state.bereich)}` : "/api/prozesse");
       if (liste.length === 0) {
-        el.prozessListe.innerHTML = `<li class="prozess-leer">Noch keine Prozesse gespeichert.</li>`;
+        el.prozessListe.innerHTML = `<li class="prozess-leer">In diesem Arbeitsbereich sind noch keine Prozesse gespeichert.</li>`;
         return;
       }
       el.prozessListe.replaceChildren(...liste.map((p) => {
@@ -1150,7 +1251,8 @@
             toast(error.message, "error");
           }
         });
-        li.append(oeffnen, loeschen);
+        if (state.bereiche.length > 1) li.append(oeffnen, verschiebenAuswahl(p), loeschen);
+        else li.append(oeffnen, loeschen);
         return li;
       }));
     } catch (error) {
@@ -1466,7 +1568,7 @@
       return true;
     }
     $("btn-abmelden").title = konto ? `Abmelden (angemeldet als ${konto})` : "Abmelden";
-    await ladeModelle();
+    await Promise.all([ladeModelle(), ladeBereiche()]);
     aktualisiereVorschlagZahl();
     return false;
   }
@@ -1540,6 +1642,9 @@
       zeigeLogin();
     });
     el.dialogProzesse.querySelector("[data-close]").addEventListener("click", () => el.dialogProzesse.close());
+    el.arbeitsbereich.addEventListener("change", () => waehleBereich(el.arbeitsbereich.value));
+    $("btn-bereich-neu").addEventListener("click", bereichAnlegen);
+    $("btn-bereich-umbenennen").addEventListener("click", bereichUmbenennen);
     el.elementName.addEventListener("input", uebernehmeName);
     el.elementBeschreibung.addEventListener("input", uebernehmeBeschreibung);
     el.quelltext.addEventListener("input", () => {
