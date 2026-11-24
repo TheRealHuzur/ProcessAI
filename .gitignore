@@ -3,6 +3,7 @@ node_modules/
 
 # Lokale Daten und Datenbank
 data/
+data-portal/
 *.db
 *.db-journal
 *.db-wal

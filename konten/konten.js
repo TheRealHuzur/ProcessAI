@@ -1,0 +1,170 @@
+// Kontokern: Mandanten mit genau einem Zugang, freigeschaltete Module je Mandant, Protokoll.
+// Kennt keine Module im Einzelnen; welche es gibt, weiß die App, die den Kern nutzt.
+import crypto from "node:crypto";
+import { hashePasswort, passwortPasst } from "./passwort.js";
+
+// Schema des Kontokerns, als Bereich "konten" fortgezählt (siehe portal/db.js)
+export const KONTEN_MIGRATIONEN = [
+  `CREATE TABLE mandanten (
+     id TEXT PRIMARY KEY,
+     name TEXT NOT NULL,
+     benutzername TEXT NOT NULL COLLATE NOCASE UNIQUE,
+     passwort_hash TEXT NOT NULL,
+     aktiv INTEGER NOT NULL DEFAULT 1,
+     angelegt TEXT NOT NULL,
+     geaendert TEXT NOT NULL
+   );
+   CREATE TABLE mandant_module (
+     mandant_id TEXT NOT NULL REFERENCES mandanten(id),
+     modul_id TEXT NOT NULL,
+     lizenz TEXT NOT NULL DEFAULT 'test' CHECK (lizenz IN ('test', 'voll')),
+     seit TEXT NOT NULL,
+     PRIMARY KEY (mandant_id, modul_id)
+   );
+   CREATE TABLE protokoll (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     zeit TEXT NOT NULL,
+     mandant_id TEXT,
+     modul_id TEXT NOT NULL DEFAULT '',
+     aktion TEXT NOT NULL,
+     ergebnis TEXT NOT NULL CHECK (ergebnis IN ('ok', 'fehler')),
+     details TEXT NOT NULL DEFAULT ''
+   );
+   CREATE INDEX idx_protokoll_mandant ON protokoll(mandant_id, id DESC);`
+];
+
+export const LIZENZEN = ["test", "voll"];
+const MIN_PASSWORT = 8;
+const MAX_TEXT = 120;
+// Platzhalter, damit eine Anmeldung mit unbekanntem Namen gleich lange dauert
+const LEER_HASH = hashePasswort(crypto.randomBytes(12).toString("hex"));
+
+export class KontenFehler extends Error {
+  constructor(message, status = 400) {
+    super(message);
+    this.status = status;
+  }
+}
+
+function jetzt() {
+  return new Date().toISOString();
+}
+
+function text(wert, feld) {
+  const t = String(wert ?? "").replace(/\s+/g, " ").trim();
+  if (!t) throw new KontenFehler(`${feld} fehlt.`);
+  if (t.length > MAX_TEXT) throw new KontenFehler(`${feld} ist zu lang (höchstens ${MAX_TEXT} Zeichen).`);
+  return t;
+}
+
+function benutzername(wert) {
+  const t = text(wert, "Benutzername");
+  if (!/^[\p{L}\p{N}._@-]+$/u.test(t)) throw new KontenFehler("Benutzername nur aus Buchstaben, Ziffern und . _ @ - ohne Leerzeichen.");
+  return t;
+}
+
+function passwort(wert) {
+  const p = String(wert ?? "");
+  if (p.length < MIN_PASSWORT) throw new KontenFehler(`Passwort mit mindestens ${MIN_PASSWORT} Zeichen.`);
+  if (p.length > 200) throw new KontenFehler("Passwort ist zu lang.");
+  return p;
+}
+
+export function kontokern(db) {
+  const q = {
+    alle: db.prepare("SELECT id, name, benutzername, aktiv, angelegt, geaendert FROM mandanten ORDER BY name COLLATE NOCASE"),
+    eins: db.prepare("SELECT id, name, benutzername, aktiv, angelegt, geaendert FROM mandanten WHERE id = ?"),
+    nachName: db.prepare("SELECT * FROM mandanten WHERE benutzername = ?"),
+    anlegen: db.prepare("INSERT INTO mandanten (id, name, benutzername, passwort_hash, aktiv, angelegt, geaendert) VALUES (?, ?, ?, ?, 1, ?, ?)"),
+    module: db.prepare("SELECT modul_id, lizenz, seit FROM mandant_module WHERE mandant_id = ? ORDER BY modul_id"),
+    modulAn: db.prepare(`INSERT INTO mandant_module (mandant_id, modul_id, lizenz, seit) VALUES (?, ?, ?, ?)
+                         ON CONFLICT (mandant_id, modul_id) DO UPDATE SET lizenz = excluded.lizenz`),
+    modulAus: db.prepare("DELETE FROM mandant_module WHERE mandant_id = ? AND modul_id = ?"),
+    protokollieren: db.prepare("INSERT INTO protokoll (zeit, mandant_id, modul_id, aktion, ergebnis, details) VALUES (?, ?, ?, ?, ?, ?)"),
+    protokollAlle: db.prepare("SELECT * FROM protokoll ORDER BY id DESC LIMIT ?"),
+    protokollMandant: db.prepare("SELECT * FROM protokoll WHERE mandant_id = ? ORDER BY id DESC LIMIT ?")
+  };
+
+  const mitModulen = (m) => m && ({ ...m, aktiv: Boolean(m.aktiv), module: q.module.all(m.id) });
+
+  function holen(id) {
+    const m = mitModulen(q.eins.get(String(id)));
+    if (!m) throw new KontenFehler("Mandant nicht gefunden.", 404);
+    return m;
+  }
+
+  function eindeutig(name, ausserId = null) {
+    const vorhanden = q.nachName.get(name);
+    if (vorhanden && vorhanden.id !== ausserId) throw new KontenFehler("Diesen Benutzernamen gibt es schon.", 409);
+  }
+
+  return {
+    liste: () => q.alle.all().map(mitModulen),
+    holen,
+
+    anlegen({ name, benutzername: bn, passwort: pw }) {
+      const n = text(name, "Name");
+      const b = benutzername(bn);
+      const p = passwort(pw);
+      eindeutig(b);
+      const id = crypto.randomUUID();
+      const zeit = jetzt();
+      q.anlegen.run(id, n, b, hashePasswort(p), zeit, zeit);
+      return holen(id);
+    },
+
+    // Nur übergebene Felder ändern; Passwort setzt Patrick, es gibt kein Zurücksetzen per Mail
+    aendern(id, { name, benutzername: bn, passwort: pw, aktiv } = {}) {
+      const alt = holen(id);
+      const felder = [];
+      const werte = [];
+      if (name !== undefined) { felder.push("name = ?"); werte.push(text(name, "Name")); }
+      if (bn !== undefined) {
+        const b = benutzername(bn);
+        eindeutig(b, alt.id);
+        felder.push("benutzername = ?"); werte.push(b);
+      }
+      if (pw !== undefined && pw !== "") { felder.push("passwort_hash = ?"); werte.push(hashePasswort(passwort(pw))); }
+      if (aktiv !== undefined) { felder.push("aktiv = ?"); werte.push(aktiv ? 1 : 0); }
+      if (felder.length) {
+        db.prepare(`UPDATE mandanten SET ${felder.join(", ")}, geaendert = ? WHERE id = ?`).run(...werte, jetzt(), alt.id);
+      }
+      return holen(alt.id);
+    },
+
+    // Modul freischalten (an) oder sperren; welche Modul-IDs gültig sind, prüft die App
+    modulSetzen(id, modulId, { an, lizenz = "test" }) {
+      const m = holen(id);
+      if (!LIZENZEN.includes(lizenz)) throw new KontenFehler("Unbekannte Lizenz.");
+      if (an) q.modulAn.run(m.id, String(modulId), lizenz, jetzt());
+      else q.modulAus.run(m.id, String(modulId));
+      return holen(m.id);
+    },
+
+    hatModul(id, modulId) {
+      return q.module.all(String(id)).some((x) => x.modul_id === modulId);
+    },
+
+    // Mandant bei passendem Zugang, sonst null; gesperrte Mandanten kommen nicht hinein
+    pruefeZugang(bn, pw) {
+      const m = q.nachName.get(String(bn ?? "").trim());
+      const passt = passwortPasst(String(pw ?? ""), m ? m.passwort_hash : LEER_HASH);
+      if (!m || !passt || !m.aktiv) return null;
+      return holen(m.id);
+    },
+
+    // Aktiver Mandant zur ID aus der Sitzung, sonst null
+    aktiverMandant(id) {
+      const m = mitModulen(q.eins.get(String(id)));
+      return m && m.aktiv ? m : null;
+    },
+
+    protokolliere({ mandantId = null, modulId = "", aktion, ergebnis = "ok", details = "" }) {
+      q.protokollieren.run(jetzt(), mandantId, modulId, String(aktion), ergebnis, String(details).slice(0, 500));
+    },
+
+    protokoll({ mandantId = null, anzahl = 200 } = {}) {
+      return mandantId ? q.protokollMandant.all(mandantId, anzahl) : q.protokollAlle.all(anzahl);
+    }
+  };
+}

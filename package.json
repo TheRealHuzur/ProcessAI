@@ -10,7 +10,8 @@
   },
   "scripts": {
     "start": "node --no-warnings=ExperimentalWarning server/index.js",
-    "test": "node --no-warnings=ExperimentalWarning --test \"test/**/*.test.js\""
+    "test": "node --no-warnings=ExperimentalWarning --test \"test/**/*.test.js\"",
+    "start:portal": "node --no-warnings=ExperimentalWarning portal/server.js"
   },
   "dependencies": {
     "bpmn-moddle": "^9.0.4",

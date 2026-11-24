@@ -8,3 +8,4 @@ examples
 .env.*
 *.md
 !docs/*.md
+data-portal

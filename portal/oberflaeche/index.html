@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Wissen und Werkzeug Portal</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="stylesheet" href="/portal.css">
+</head>
+<body>
+  <header class="kopf">
+    <a class="marke" href="/">Wissen und Werkzeug <span>Portal</span></a>
+    <div class="kopf-rechts" id="kopf-rechts" hidden>
+      <span id="mandant-name"></span>
+      <button class="btn btn-zweit btn-klein" id="btn-abmelden" type="button">Abmelden</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="karte anmeldung" id="anmeldung" hidden>
+      <h1>Anmelden</h1>
+      <p class="unterzeile" style="text-align:center">Mit dem Zugang Ihrer Organisation.</p>
+      <form id="form-anmelden">
+        <label for="benutzername">Benutzername</label>
+        <input type="text" id="benutzername" autocomplete="username" required>
+        <label for="passwort">Passwort</label>
+        <input type="password" id="passwort" autocomplete="current-password" required>
+        <button class="btn btn-primaer" type="submit">Anmelden</button>
+        <div class="meldung" id="meldung-anmelden" hidden></div>
+      </form>
+    </section>
+
+    <section id="uebersicht" hidden>
+      <h1>Ihre Werkzeuge</h1>
+      <p class="unterzeile">Diese Werkzeuge sind für Ihre Organisation freigeschaltet.</p>
+      <div class="kacheln" id="kacheln"></div>
+    </section>
+  </main>
+
+  <div class="fuss">Wissen und Werkzeug · Testversion</div>
+
+  <script src="/portal.js"></script>
+  <script>
+    (function () {
+      "use strict";
+      const { api, zeigeMeldung, el, abmelden } = Portal;
+
+      function zeigeUebersicht(daten) {
+        document.getElementById("anmeldung").hidden = true;
+        document.getElementById("uebersicht").hidden = false;
+        document.getElementById("kopf-rechts").hidden = false;
+        document.getElementById("mandant-name").textContent = daten.mandant.name;
+        const kacheln = document.getElementById("kacheln");
+        kacheln.replaceChildren();
+        if (!daten.module.length) {
+          kacheln.append(el("p", { class: "leer", text: "Für Ihren Zugang ist noch kein Werkzeug freigeschaltet." }));
+          return;
+        }
+        for (const m of daten.module) {
+          kacheln.append(el("a", { class: "karte kachel", href: m.adresse }, el("h3", { text: m.name }), el("p", { text: m.beschreibung })));
+        }
+      }
+
+      function zeigeAnmeldung() {
+        document.getElementById("uebersicht").hidden = true;
+        document.getElementById("kopf-rechts").hidden = true;
+        document.getElementById("anmeldung").hidden = false;
+        document.getElementById("benutzername").focus();
+      }
+
+      document.getElementById("form-anmelden").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        const meldung = document.getElementById("meldung-anmelden");
+        const knopf = event.target.querySelector("button");
+        knopf.disabled = true;
+        zeigeMeldung(meldung, "");
+        try {
+          const daten = await api("/api/anmelden", { method: "POST", body: {
+            benutzername: document.getElementById("benutzername").value,
+            passwort: document.getElementById("passwort").value
+          } });
+          document.getElementById("passwort").value = "";
+          zeigeUebersicht(daten);
+        } catch (error) {
+          zeigeMeldung(meldung, error.message);
+        } finally {
+          knopf.disabled = false;
+        }
+      });
+      document.getElementById("btn-abmelden").addEventListener("click", abmelden);
+
+      api("/api/sitzung").then((d) => (d.angemeldet ? zeigeUebersicht(d) : zeigeAnmeldung())).catch(zeigeAnmeldung);
+    })();
+  </script>
+</body>
+</html>

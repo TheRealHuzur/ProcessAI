@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Verwaltung · Wissen und Werkzeug Portal</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="stylesheet" href="/portal.css">
+  <style>
+    .formzeile { display: grid; grid-template-columns: repeat(3, 1fr) auto; gap: 12px; align-items: end; }
+    .formzeile label { margin-top: 0; }
+    .modul-wahl { display: flex; align-items: center; gap: 6px; margin: 2px 0; font-size: 14px; white-space: nowrap; }
+    .modul-wahl select { width: auto; padding: 2px 6px; font-size: 13px; }
+    .passwort-neu { display: flex; gap: 6px; }
+    .passwort-neu input { min-width: 140px; }
+    .gesperrt td { opacity: 0.55; }
+    @media (max-width: 760px) { .formzeile { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <header class="kopf">
+    <a class="marke" href="/verwaltung/">Wissen und Werkzeug <span>Verwaltung</span></a>
+    <div class="kopf-rechts" id="kopf-rechts" hidden>
+      <button class="btn btn-zweit btn-klein" id="btn-abmelden" type="button">Abmelden</button>
+    </div>
+  </header>
+
+  <main>
+    <section class="karte anmeldung" id="anmeldung" hidden>
+      <h1>Verwaltung</h1>
+      <form id="form-anmelden">
+        <label for="admin-passwort">Passwort</label>
+        <input type="password" id="admin-passwort" autocomplete="current-password" required>
+        <button class="btn btn-primaer" type="submit">Anmelden</button>
+        <div class="meldung" id="meldung-anmelden" hidden></div>
+      </form>
+    </section>
+
+    <section id="inhalt" hidden>
+      <h1>Mandanten</h1>
+      <p class="unterzeile">Jeder Mandant hat genau einen Zugang. Das Passwort legen Sie fest; es gibt kein Zurücksetzen per Mail.</p>
+
+      <div class="karte">
+        <form id="form-neu" class="formzeile">
+          <div><label for="neu-name">Organisation</label><input type="text" id="neu-name" required></div>
+          <div><label for="neu-benutzer">Benutzername</label><input type="text" id="neu-benutzer" autocomplete="off" required></div>
+          <div><label for="neu-passwort">Passwort (mind. 8 Zeichen)</label><input type="text" id="neu-passwort" autocomplete="off" required></div>
+          <button class="btn btn-primaer" type="submit">Anlegen</button>
+        </form>
+        <div class="meldung" id="meldung" hidden></div>
+      </div>
+
+      <h2>Zugänge und Module</h2>
+      <div class="karte tabelle-rahmen">
+        <table>
+          <thead><tr><th>Organisation</th><th>Benutzername</th><th>Module</th><th>Passwort neu setzen</th><th>Zugang</th></tr></thead>
+          <tbody id="mandanten"></tbody>
+        </table>
+      </div>
+
+      <h2>Protokoll</h2>
+      <div class="karte tabelle-rahmen">
+        <table>
+          <thead><tr><th>Zeit</th><th>Organisation</th><th>Modul</th><th>Aktion</th><th>Ergebnis</th><th>Angaben</th></tr></thead>
+          <tbody id="protokoll"></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <script src="/portal.js"></script>
+  <script src="verwaltung.js"></script>
+</body>
+</html>

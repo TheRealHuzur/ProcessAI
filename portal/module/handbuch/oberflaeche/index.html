@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Handbuch-Generator · Wissen und Werkzeug Portal</title>
+  <meta name="robots" content="noindex, nofollow">
+  <link rel="stylesheet" href="/portal.css">
+  <style>
+    .ablage {
+      border: 2px dashed var(--border);
+      border-radius: 12px;
+      padding: 28px 16px;
+      text-align: center;
+      background: var(--surface-2);
+      cursor: pointer;
+      margin: 0;
+      font-size: 15px;
+      font-weight: 400;
+      color: var(--text);
+    }
+    .ablage.ueber { border-color: var(--sky); background: rgba(2, 132, 199, 0.06); }
+    .ablage strong { display: block; font-size: 16px; margin-bottom: 4px; }
+    .ablage p { margin: 0; color: var(--text-muted); font-size: 14px; }
+  </style>
+</head>
+<body>
+  <header class="kopf">
+    <a class="marke" href="/">Wissen und Werkzeug <span>Portal</span></a>
+    <div class="kopf-rechts">
+      <span id="mandant-name"></span>
+      <a class="btn btn-zweit btn-klein" href="/">Übersicht</a>
+      <button class="btn btn-zweit btn-klein" id="btn-abmelden" type="button">Abmelden</button>
+    </div>
+  </header>
+
+  <main>
+    <h1>Handbuch-Generator</h1>
+    <p class="unterzeile">BPMN-Modell hochladen und daraus ein Handbuch als PDF erstellen. Eine neue Datei mit demselben Namen ersetzt die bisherige.</p>
+
+    <div class="karte">
+      <label class="ablage" id="ablage" for="datei">
+        <strong>BPMN-Datei hier ablegen oder auswählen</strong>
+        <p>Export aus ADONIS, PICTURE oder einem anderen Werkzeug, Endung .bpmn oder .xml</p>
+      </label>
+      <input type="file" id="datei" accept=".bpmn,.xml" multiple hidden>
+      <div class="meldung" id="meldung" hidden></div>
+    </div>
+
+    <h2>Ihre Modelle</h2>
+    <div class="karte tabelle-rahmen tabelle-stapel">
+      <table>
+        <thead><tr><th>Modell</th><th>Hochgeladen</th><th>Version</th><th>Prüfung</th><th></th></tr></thead>
+        <tbody id="liste"></tbody>
+      </table>
+    </div>
+  </main>
+
+  <div class="fuss">Wissen und Werkzeug · Testversion</div>
+
+  <script src="/portal.js"></script>
+  <script src="handbuch.js"></script>
+</body>
+</html>
