@@ -1,9 +1,12 @@
 // Handbuch, Stufe 1: BPMN-XML lesen und zur Gliederung machen (Kapitel je Schwimmbahn,
-// Teilprozesse als eigene Ebene: Schwimmbahn > Teilprozess > Aktivität).
+// Teilprozesse als eigene Ebene: Schwimmbahn > Teilprozess > Aktivität; hat der Inhalt eines
+// Teilprozesses mehrere Bahnen, kommt je Bahn eine Ebene dazwischen).
+// Exporte aus PICTURE werden über picture.js zusammengeführt.
 // Gemeinsamer Kern für ProzessPilot und Kundenportal: Daten rein, Daten raus,
 // ohne Datenbank, Anmeldung, Einstellungen oder KI.
 import BpmnModdle from "bpmn-moddle";
 import "../../public/wissen.js";
+import { pictureTeilprozesse, pictureBeschreibung, pictureAufrufZiel } from "./picture.js";
 
 const PPWissen = globalThis.PPWissen;
 
@@ -13,8 +16,10 @@ export function einzeilig(text) {
   return String(text || "").replace(/\s+/g, " ").trim();
 }
 
+// Text am Schritt: BPMN-Feld documentation, dazu das Beschreibungsfeld aus PICTURE
 function arbeitshilfe(bo) {
-  return (bo.documentation || []).map((d) => d.text || "").join("\n\n").trim();
+  const teile = [(bo.documentation || []).map((d) => d.text || "").join("\n\n").trim(), pictureBeschreibung(bo)];
+  return [...new Set(teile.filter(Boolean))].join("\n\n");
 }
 
 function istAktivitaet(bo) {
@@ -59,22 +64,58 @@ export async function leseHandbuch(xml) {
     .sort((a, b) => (a.b ? 0 : 1) - (b.b ? 0 : 1) || (a.b && b.b ? a.b.x - b.b.x || a.b.y - b.b.y : 0) || a.i - b.i)
     .map((x) => x.bo);
 
-  const eintrag = (bo) => {
+  const wurzeln = definitions.rootElements || [];
+  const alleProzesse = wurzeln.filter((r) => r.$type === "bpmn:Process");
+  // PICTURE: Teilprozess -> Prozess mit seinem Inhalt; diese Prozesse sind keine eigenen Kapitel
+  const teilprozessInhalt = pictureTeilprozesse(definitions);
+  const inhaltsProzesse = new Set(teilprozessInhalt.values());
+
+  // Name des Modells, das eine Aufrufaktivität aufruft
+  const aufrufName = (bo) => {
+    const gerufen = typeof bo.calledElement === "string" ? alleProzesse.find((p) => p.id === bo.calledElement) : null;
+    return einzeilig(pictureAufrufZiel(bo) || (gerufen && gerufen.name) || bo.name);
+  };
+
+  // Schritte im Inneren eines Teilprozesses; mehr als eine Bahn mit Schritten: je Bahn eine Ebene
+  const inhalt = (container, besucht) => {
+    const aktivitaeten = (container.flowElements || []).filter(istAktivitaet);
+    const gruppen = [];
+    const zugeordnet = new Set();
+    for (const bahn of (container.laneSets || []).flatMap((ls) => blattBahnen(ls))) {
+      const ids = new Set((bahn.flowNodeRef || []).map((n) => n.id));
+      const inBahn = aktivitaeten.filter((a) => ids.has(a.id));
+      inBahn.forEach((a) => zugeordnet.add(a.id));
+      if (inBahn.length) gruppen.push({ name: einzeilig(bahn.name) || "Schwimmbahn ohne Namen", liste: inBahn });
+    }
+    const rest = aktivitaeten.filter((a) => !zugeordnet.has(a.id));
+    if (rest.length && gruppen.length) gruppen.push({ name: "Ohne Schwimmbahn", liste: rest });
+    if (gruppen.length < 2) return sortiert(aktivitaeten).map((a) => eintrag(a, besucht));
+    return gruppen.map((g) => ({ art: "bahn", id: "", name: g.name, arbeitshilfe: "", hinweis: "", wissen: PPWissen.leer(), eintraege: sortiert(g.liste).map((a) => eintrag(a, besucht)) }));
+  };
+
+  function eintrag(bo, besucht = new Set()) {
     const teilprozess = istTeilprozess(bo);
+    let eintraege = [];
+    if (teilprozess) {
+      const container = (bo.flowElements || []).some(istAktivitaet) ? bo : teilprozessInhalt.get(bo.id);
+      if (container && !besucht.has(container)) eintraege = inhalt(container, new Set([...besucht, container]));
+    }
     return {
       art: teilprozess ? "teilprozess" : "aufgabe",
       id: bo.id,
       name: einzeilig(bo.name),
       arbeitshilfe: arbeitshilfe(bo),
+      hinweis: bo.$instanceOf("bpmn:CallActivity") && !eintraege.length ? `Siehe Modell „${aufrufName(bo) || "ohne Namen"}“` : "",
       wissen: PPWissen.lesen(bo),
-      eintraege: teilprozess ? sortiert((bo.flowElements || []).filter(istAktivitaet)).map(eintrag) : []
+      eintraege
     };
-  };
+  }
 
-  const wurzeln = definitions.rootElements || [];
   const kollaboration = wurzeln.find((r) => r.$type === "bpmn:Collaboration");
   const teilnehmerVon = new Map(((kollaboration && kollaboration.participants) || []).filter((p) => p.processRef).map((p) => [p.processRef.id, p]));
-  const prozesse = wurzeln.filter((r) => r.$type === "bpmn:Process" && (r.flowElements || []).some(istAktivitaet));
+  const mitSchritten = alleProzesse.filter((r) => (r.flowElements || []).some(istAktivitaet));
+  const hauptprozesse = mitSchritten.filter((r) => !inhaltsProzesse.has(r));
+  const prozesse = hauptprozesse.length ? hauptprozesse : mitSchritten;
 
   const kapitel = [];
   let einfuehrung = "";
@@ -82,7 +123,7 @@ export async function leseHandbuch(xml) {
     const teilnehmer = teilnehmerVon.get(prozess.id);
     const poolName = einzeilig((teilnehmer && teilnehmer.name) || prozess.name);
     const zusatz = prozesse.length > 1 && poolName ? ` (${poolName})` : "";
-    if (!einfuehrung) einfuehrung = (teilnehmer && arbeitshilfe(teilnehmer)) || arbeitshilfe(prozess);
+    if (!einfuehrung) einfuehrung = (teilnehmer && arbeitshilfe(teilnehmer)) || arbeitshilfe(prozess) || (kollaboration ? arbeitshilfe(kollaboration) : "");
 
     const aktivitaeten = (prozess.flowElements || []).filter(istAktivitaet);
     const bahnen = (prozess.laneSets || []).flatMap((ls) => blattBahnen(ls));
@@ -91,12 +132,12 @@ export async function leseHandbuch(xml) {
       const ids = new Set((bahn.flowNodeRef || []).map((n) => n.id));
       const inBahn = aktivitaeten.filter((a) => ids.has(a.id));
       inBahn.forEach((a) => zugeordnet.add(a.id));
-      if (inBahn.length) kapitel.push({ titel: (einzeilig(bahn.name) || "Schwimmbahn ohne Namen") + zusatz, eintraege: sortiert(inBahn).map(eintrag) });
+      if (inBahn.length) kapitel.push({ titel: (einzeilig(bahn.name) || "Schwimmbahn ohne Namen") + zusatz, eintraege: sortiert(inBahn).map((a) => eintrag(a, new Set([prozess]))) });
     }
     const rest = aktivitaeten.filter((a) => !zugeordnet.has(a.id));
     if (rest.length) {
       const titel = bahnen.length ? `Ohne Schwimmbahn${zusatz}` : poolName || "Prozess";
-      kapitel.push({ titel, eintraege: sortiert(rest).map(eintrag) });
+      kapitel.push({ titel, eintraege: sortiert(rest).map((a) => eintrag(a, new Set([prozess]))) });
     }
   }
   if (!kapitel.length) throw new HandbuchFehler("Das Modell enthält noch keine Aufgaben oder Teilprozesse.");

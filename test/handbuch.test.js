@@ -90,3 +90,48 @@ test("Handbuch: ohne Aktivitäten oder mit kaputtem XML gibt es eine verständli
   await assert.rejects(leseHandbuch(leer), HandbuchFehler);
   await assert.rejects(leseHandbuch("<kein xml"), HandbuchFehler);
 });
+
+// PICTURE: Inhalt der Teilprozesse aus verknüpften Diagrammen, Bahnen im Teilprozess, nur das Beschreibungsfeld
+const picture = fs.readFileSync(path.join(__dirname, "fixtures", "picture-teilprozesse.bpmn"), "utf8");
+const gliederung = (e) => ({ art: e.art, name: e.name, ...(e.hinweis ? { hinweis: e.hinweis } : {}), eintraege: e.eintraege.map(gliederung) });
+
+test("PICTURE: Teilprozess bekommt Inhalt aus dem verknüpften Diagramm, je Bahn eine Ebene", async () => {
+  const handbuch = await leseHandbuch(picture);
+  assert.equal(handbuch.titel, "Seminar durchführen");
+  assert.equal(handbuch.einfuehrung, "", "Prozessauslöser gehört vorerst nicht ins Handbuch");
+  assert.deepEqual(handbuch.kapitel.map((k) => ({ titel: k.titel, eintraege: k.eintraege.map(gliederung) })), [{
+    titel: "Verwaltung",
+    eintraege: [
+      { art: "teilprozess", name: "Anfrage bearbeiten", eintraege: [
+        { art: "bahn", name: "Dozent", eintraege: [
+          { art: "aufgabe", name: "Termin prüfen", eintraege: [] },
+          { art: "aufgabe", name: "Seminar zusagen", eintraege: [] }
+        ] },
+        { art: "bahn", name: "Geschäftszimmer", eintraege: [{ art: "aufgabe", name: "Termin eintragen", eintraege: [] }] }
+      ] },
+      { art: "teilprozess", name: "Seminar durchführen", eintraege: [] },
+      { art: "teilprozess", name: "Rechnung stellen", hinweis: "Siehe Modell „Rechnungswesen: Rechnung stellen“", eintraege: [] },
+      { art: "teilprozess", name: "Mahnverfahren durchführen", hinweis: "Siehe Modell „Mahnverfahren durchführen“", eintraege: [] }
+    ]
+  }]);
+});
+
+test("PICTURE: nur das Beschreibungsfeld, keine Verbesserungsvorschläge, Nummerierung oder Farben", async () => {
+  const { kapitel } = await leseHandbuch(picture);
+  const [dozent] = kapitel[0].eintraege[0].eintraege;
+  assert.equal(dozent.eintraege[0].arbeitshilfe, "Kalender auf freie Tage prüfen.");
+  assert.equal(dozent.eintraege[1].arbeitshilfe, "Zusage per Mail.");
+});
+
+test("PICTURE: PDF mit Bahnen unter dem Teilprozess und Hinweisen statt leerer Stellen", async () => {
+  const dokument = handbuchDokument(await leseHandbuch(picture), { stand: "24.11.2026" });
+  const texte = dokument.content.map((k) => k.text).filter((t) => typeof t === "string");
+  for (const erwartet of ["1.1  Anfrage bearbeiten", "1.1.1  Dozent", "1.1.1.1  Termin prüfen", "1.1.2  Geschäftszimmer", "Keine Beschreibung hinterlegt.", "Siehe Modell „Rechnungswesen: Rechnung stellen“"]) {
+    assert.ok(texte.includes(erwartet), `fehlt: ${erwartet}`);
+  }
+  assert.ok(!texte.some((t) => /Geht das schneller/.test(t)));
+  assert.equal(texte.filter((t) => t === "Schwimmbahn").length, 2);
+  assert.equal(texte.filter((t) => t === "Noch keine Arbeitshilfe hinterlegt.").length, 1, "nur Termin eintragen ist leer");
+  const pdf = await erzeugeHandbuch(picture, { stand: "24.11.2026" });
+  assert.equal(Buffer.from(pdf).subarray(0, 5).toString(), "%PDF-");
+});

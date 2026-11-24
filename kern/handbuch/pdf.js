@@ -34,14 +34,18 @@ function ueberschrift(nummer, text, ebene) {
 function eintragInhalt(e, nummer, ebene) {
   const inhalt = [ueberschrift(nummer, e.name || "Ohne Namen", ebene)];
   if (e.art === "teilprozess") inhalt.push({ text: "Teilprozess", style: "kennzeichen" });
+  if (e.art === "bahn") inhalt.push({ text: "Schwimmbahn", style: "kennzeichen" });
   if (e.arbeitshilfe) inhalt.push(...absaetze(e.arbeitshilfe));
   for (const f of PPWissen.FELDER) {
     const werte = e.wissen[f.key] || [];
     if (!werte.length) continue;
     inhalt.push({ text: f.titel, style: "feldTitel" }, { ul: werte.map((w) => ({ text: mitLinks(w) })), style: "liste" });
   }
-  const hatInhalt = e.arbeitshilfe || !PPWissen.istLeer(e.wissen);
-  if (!hatInhalt && !e.eintraege.length) inhalt.push({ text: "Noch keine Arbeitshilfe hinterlegt.", style: "fehlt" });
+  if (e.hinweis) inhalt.push({ text: e.hinweis, style: "fehlt" });
+  const hatInhalt = e.arbeitshilfe || e.hinweis || !PPWissen.istLeer(e.wissen);
+  if (!hatInhalt && !e.eintraege.length && e.art !== "bahn") {
+    inhalt.push({ text: e.art === "teilprozess" ? "Keine Beschreibung hinterlegt." : "Noch keine Arbeitshilfe hinterlegt.", style: "fehlt" });
+  }
   e.eintraege.forEach((kind, i) => inhalt.push(...eintragInhalt(kind, `${nummer}.${i + 1}`, ebene + 1)));
   return inhalt;
 }
