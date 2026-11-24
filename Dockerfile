@@ -9,6 +9,7 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 
+COPY kern ./kern
 COPY server ./server
 COPY public ./public
 COPY docs ./docs
