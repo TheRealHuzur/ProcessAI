@@ -81,37 +81,41 @@ export function pictureAufrufZiel(bo) {
   return (link && link.referenzen.map((r) => r.label).find(Boolean)) || "";
 }
 
-// Teilprozess-ID -> Prozess mit dem Inhalt aus dem verknüpften Diagramm
-export function pictureTeilprozesse(definitions) {
-  const ergebnis = new Map();
+// Diagramm -> der eine Prozess, den es zeigt (über Pool, Bahnen oder Schritte). Schlüssel sind die
+// eingelesenen Objekte, nicht die IDs: Beim Zusammenführen mehrerer Dateien können IDs doppelt sein.
+export function prozesseDerDiagramme(definitions) {
   const wurzeln = definitions.rootElements || [];
-  const prozesse = wurzeln.filter((r) => r.$type === "bpmn:Process");
-  const kollaborationen = wurzeln.filter((r) => r.$type === "bpmn:Collaboration");
-
-  // Element-ID -> Prozess, zu dem es gehört (auch in Teilprozessen und Bahnen)
   const prozessVon = new Map();
   const merke = (container, prozess) => {
     for (const el of container.flowElements || []) {
-      prozessVon.set(el.id, prozess);
+      prozessVon.set(el, prozess);
       if (el.flowElements) merke(el, prozess);
     }
   };
-  for (const p of prozesse) {
+  for (const p of wurzeln.filter((r) => r.$type === "bpmn:Process")) {
     merke(p, p);
-    for (const ls of p.laneSets || []) for (const lane of ls.lanes || []) prozessVon.set(lane.id, p);
+    for (const ls of p.laneSets || []) for (const lane of ls.lanes || []) prozessVon.set(lane, p);
   }
-  for (const k of kollaborationen) for (const t of k.participants || []) if (t.processRef) prozessVon.set(t.id, t.processRef);
-
-  // Diagramm -> der eine Prozess, den es zeigt
-  const prozessImDiagramm = new Map();
+  for (const k of wurzeln.filter((r) => r.$type === "bpmn:Collaboration")) {
+    for (const t of k.participants || []) if (t.processRef) prozessVon.set(t, t.processRef);
+  }
+  const ergebnis = new Map();
   for (const d of definitions.diagrams || []) {
     const gezeigt = new Set();
     for (const form of (d.plane && d.plane.planeElement) || []) {
-      const p = form.bpmnElement && prozessVon.get(form.bpmnElement.id);
+      const p = form.bpmnElement && prozessVon.get(form.bpmnElement);
       if (p) gezeigt.add(p);
     }
-    if (gezeigt.size === 1) prozessImDiagramm.set(d.id, [...gezeigt][0]);
+    if (gezeigt.size === 1) ergebnis.set(d, [...gezeigt][0]);
   }
+  return { prozessVon, prozessImDiagramm: ergebnis };
+}
+
+// Teilprozess (Objekt) -> Prozess mit dem Inhalt aus dem verknüpften Diagramm, auch über Dateigrenzen
+export function pictureTeilprozesse(definitions) {
+  const ergebnis = new Map();
+  const prozesse = (definitions.rootElements || []).filter((r) => r.$type === "bpmn:Process");
+  const { prozessVon, prozessImDiagramm } = prozesseDerDiagramme(definitions);
 
   const besuche = (container) => {
     for (const el of container.flowElements || []) {
@@ -120,8 +124,8 @@ export function pictureTeilprozesse(definitions) {
         const uuid = link && link.referenzen.map((r) => r.uuid).find(Boolean);
         if (uuid) {
           const diagramm = (definitions.diagrams || []).find((d) => d.id === uuid || d.id === `DIAGRAM_${uuid}` || String(d.id).endsWith(uuid));
-          const inhalt = diagramm && prozessImDiagramm.get(diagramm.id);
-          if (inhalt && inhalt !== prozessVon.get(el.id)) ergebnis.set(el.id, inhalt);
+          const inhalt = diagramm && prozessImDiagramm.get(diagramm);
+          if (inhalt && inhalt !== prozessVon.get(el)) ergebnis.set(el, inhalt);
         }
       }
       if (el.flowElements) besuche(el);

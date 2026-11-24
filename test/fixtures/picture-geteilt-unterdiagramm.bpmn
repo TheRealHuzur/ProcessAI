@@ -1,0 +1,65 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Künstliches Beispiel: PICTURE-Export je Diagramm eine Datei (Unterdiagramm). -->
+<bpmn2:definitions xmlns:bpmn2="http://www.omg.org/spec/BPMN/20100524/MODEL" xmlns:bpmndi="http://www.omg.org/spec/BPMN/20100524/DI" xmlns:dc="http://www.omg.org/spec/DD/20100524/DC" xmlns:di="http://www.omg.org/spec/DD/20100524/DI" xmlns:pic="http://www.picture-gmbh.de/bpmn-ext" id="DEFINITIONS_2" targetNamespace="http://example.org/picture" exporter="PICTURE" exporterVersion="3.0.0">
+    <bpmn2:collaboration id="collaboration_inhalt">
+    <bpmn2:participant id="P_inhalt" name="Prozesspool" processRef="PROCESS_inhalt"/>
+  </bpmn2:collaboration>
+
+  <bpmn2:process id="PROCESS_inhalt">
+    <bpmn2:laneSet id="LS_inhalt">
+      <bpmn2:lane id="L_dozent" name="Dozent">
+        <bpmn2:flowNodeRef>T_zusagen</bpmn2:flowNodeRef>
+        <bpmn2:flowNodeRef>T_pruefen</bpmn2:flowNodeRef>
+      </bpmn2:lane>
+      <bpmn2:lane id="L_geschaeftszimmer" name="Geschäftszimmer">
+        <bpmn2:flowNodeRef>T_eintragen</bpmn2:flowNodeRef>
+      </bpmn2:lane>
+    </bpmn2:laneSet>
+    <bpmn2:task id="T_zusagen" name="Seminar zusagen">
+      <bpmn2:documentation textFormat="text/plain">Zusage per Mail.</bpmn2:documentation>
+      <bpmn2:extensionElements>
+        <pic:attributes>
+          <pic:attributeGroup label="Stammdaten">
+            <richtextValue attributeID="description" dataType="richtext" name="Beschreibung"><value><![CDATA[<p>Zusage per Mail.</p>]]></value></richtextValue>
+          </pic:attributeGroup>
+        </pic:attributes>
+      </bpmn2:extensionElements>
+    </bpmn2:task>
+    <bpmn2:task id="T_pruefen" name="Termin prüfen">
+      <bpmn2:extensionElements>
+        <pic:attributes>
+          <pic:attributeGroup label="Stammdaten">
+            <textValue attributeID="picture.std.attribute#continuousNumber" dataType="text" name="Nummerierung (Diagramm)"><value>1</value></textValue>
+            <textValue attributeID="picture.attribute.std#Beschreibung+01" dataType="text" name="Beschreibung"><value>Kalender auf freie Tage prüfen.</value></textValue>
+          </pic:attributeGroup>
+          <pic:attributeGroup label="Verbesserungsvorschlag">
+            <textValue attributeID="picture.attribute.std#VerbesserungsvorschlagFragestellung" dataType="text" name="Fragestellung"><value>Geht das schneller?</value></textValue>
+          </pic:attributeGroup>
+        </pic:attributes>
+      </bpmn2:extensionElements>
+    </bpmn2:task>
+    <bpmn2:task id="T_eintragen" name="Termin eintragen">
+      <bpmn2:extensionElements>
+        <pic:attributes>
+          <pic:attributeGroup label="Stammdaten">
+            <richtextValue attributeID="description" dataType="richtext" name="Beschreibung"><value><![CDATA[<p>Eintragen in:</p><ul><li><p>Kalender &amp; Liste</p><ul><li><p>Outlook</p></li></ul></li><li><p>Trello</p></li></ul>]]></value></richtextValue>
+          </pic:attributeGroup>
+          <pic:attributeGroup label="Wissensmanagement">
+            <richtextValue attributeID="ca62a387-4d79-4298-941a-1cb649ffefc3" dataType="richtext" name="Verbesserungsvorschläge"><value><![CDATA[<p>Intern</p>]]></value></richtextValue>
+          </pic:attributeGroup>
+        </pic:attributes>
+      </bpmn2:extensionElements>
+    </bpmn2:task>
+  </bpmn2:process>
+
+  <bpmndi:BPMNDiagram id="DIAGRAM_aaaa-1111" name="Anfrage bearbeiten">
+    <bpmndi:BPMNPlane id="PLANE_inhalt" bpmnElement="collaboration_inhalt">
+      <bpmndi:BPMNShape id="S_P_inhalt" bpmnElement="P_inhalt"><dc:Bounds x="0" y="0" width="900" height="400"/></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_L_dozent" bpmnElement="L_dozent"><dc:Bounds x="30" y="0" width="870" height="200"/></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_L_gz" bpmnElement="L_geschaeftszimmer"><dc:Bounds x="30" y="200" width="870" height="200"/></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_T_pruefen" bpmnElement="T_pruefen"><dc:Bounds x="100" y="50" width="100" height="80"/></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_T_eintragen" bpmnElement="T_eintragen"><dc:Bounds x="200" y="250" width="100" height="80"/></bpmndi:BPMNShape>
+      <bpmndi:BPMNShape id="S_T_zusagen" bpmnElement="T_zusagen"><dc:Bounds x="300" y="50" width="100" height="80"/></bpmndi:BPMNShape>
+    </bpmndi:BPMNPlane>
+  </bpmndi:BPMNDiagram>
+</bpmn2:definitions>

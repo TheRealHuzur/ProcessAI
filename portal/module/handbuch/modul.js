@@ -1,4 +1,5 @@
-// Modul Logbuch (ID handbuch): BPMN-Datei und Titel rein, Handbuch als PDF raus. Mehr sieht der
+// Modul Logbuch (ID handbuch): BPMN-Datei(en) und Titel rein, Handbuch als PDF raus. Mehrere Dateien
+// werden zu einem Handbuch zusammengeführt (PICTURE exportiert teils je Diagramm eine Datei). Mehr sieht der
 // Kunde nicht. Im Hintergrund bleibt jede hochgeladene Datei auf dem Server (Übungsmaterial zur
 // Verbesserung, mit den Kunden abgesprochen); angezeigt oder wiederverwendet wird davon nichts.
 import crypto from "node:crypto";
@@ -8,13 +9,14 @@ import { fileURLToPath } from "node:url";
 import express from "express";
 import { erzeugeHandbuch, HandbuchFehler } from "../../../kern/handbuch/index.js";
 
-const MAX_GROESSE = "20mb";
+const MAX_GROESSE = "30mb";
+const MAX_DATEIEN = 20;
 const MAX_DATEINAME = 150;
 const MAX_TITEL = 150;
 const ERSTELLT_MIT = "Erstellt mit dem ProzessPilot von Wissen und Werkzeug";
 const FUSSHINWEIS = "Wissen und Werkzeug";
 
-// Noch nirgends deployt (Stand 24.11.2026); ab dem ersten Deployment nur noch anhängen
+// Live seit 24.11.2026: nur noch anhängen
 const MIGRATIONEN = [
   `CREATE TABLE hb_uploads (
      id TEXT PRIMARY KEY,
@@ -27,22 +29,21 @@ const MIGRATIONEN = [
      meldung TEXT NOT NULL DEFAULT '',
      hochgeladen TEXT NOT NULL
    );
-   CREATE INDEX idx_hb_uploads_mandant ON hb_uploads(mandant_id, hochgeladen);`
+   CREATE INDEX idx_hb_uploads_mandant ON hb_uploads(mandant_id, hochgeladen);`,
+  // Mehrere Dateien je Handbuch: gemeinsame Vorgangs-ID
+  `ALTER TABLE hb_uploads ADD COLUMN vorgang TEXT NOT NULL DEFAULT '';
+   UPDATE hb_uploads SET vorgang = id WHERE vorgang = '';`
 ];
 
 class EingabeFehler extends Error {}
 
-// Text aus einer Kopfzeile (URL-kodiert), ohne Steuerzeichen und doppelte Leerzeichen
-function kopfText(wert) {
-  try {
-    return decodeURIComponent(String(wert || "")).replace(/[\u0000-\u001f\u007f]/g, "").replace(/\s+/g, " ").trim();
-  } catch {
-    return "";
-  }
+// Text ohne Steuerzeichen und doppelte Leerzeichen
+function bereinigt(wert) {
+  return String(wert || "").replace(/[\u0000-\u001f\u007f]/g, "").replace(/\s+/g, " ").trim();
 }
 
 function dateinameAus(wert) {
-  const name = path.basename(kopfText(wert).replace(/\\/g, "/"));
+  const name = path.basename(bereinigt(wert).replace(/\\/g, "/"));
   if (!name) throw new EingabeFehler("Der Dateiname fehlt.");
   if (name.length > MAX_DATEINAME) throw new EingabeFehler(`Der Dateiname ist zu lang (höchstens ${MAX_DATEINAME} Zeichen).`);
   if (!/\.(bpmn|xml)$/i.test(name)) throw new EingabeFehler("Bitte eine BPMN-Datei hochladen (Endung .bpmn oder .xml).");
@@ -59,38 +60,48 @@ function datumHeute() {
 }
 
 function router({ db, kern, datenDir }) {
-  const ablegen = db.prepare(`INSERT INTO hb_uploads (id, mandant_id, dateiname, titel, datei, groesse, status, meldung, hochgeladen)
-                              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+  const ablegen = db.prepare(`INSERT INTO hb_uploads (id, vorgang, mandant_id, dateiname, titel, datei, groesse, status, meldung, hochgeladen)
+                              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
   const r = express.Router();
 
-  r.post("/erstellen", express.raw({ type: () => true, limit: MAX_GROESSE }), async (req, res) => {
-    let dateiname;
+  // Erwartet JSON { titel, dateien: [{ name, inhalt }] }; inhalt ist der Text der BPMN-Datei
+  r.post("/erstellen", express.json({ limit: MAX_GROESSE }), async (req, res) => {
+    let dateien;
     let titel;
-    let inhalt;
     try {
-      dateiname = dateinameAus(req.get("x-dateiname"));
-      titel = kopfText(req.get("x-titel")).slice(0, MAX_TITEL) || titelAusDateiname(dateiname);
-      inhalt = Buffer.isBuffer(req.body) ? req.body : Buffer.alloc(0);
-      if (!inhalt.length) throw new EingabeFehler("Die Datei ist leer.");
+      const roh = Array.isArray(req.body && req.body.dateien) ? req.body.dateien : [];
+      if (!roh.length) throw new EingabeFehler("Bitte mindestens eine BPMN-Datei auswählen.");
+      if (roh.length > MAX_DATEIEN) throw new EingabeFehler(`Höchstens ${MAX_DATEIEN} Dateien auf einmal.`);
+      dateien = roh.map((d) => {
+        const name = dateinameAus(d && d.name);
+        const inhalt = String((d && d.inhalt) || "").replace(/^\uFEFF/, "");
+        if (!inhalt.trim()) throw new EingabeFehler(`Die Datei „${name}“ ist leer.`);
+        return { name, inhalt };
+      });
+      titel = bereinigt(req.body && req.body.titel).slice(0, MAX_TITEL) || titelAusDateiname(dateien[0].name);
     } catch (error) {
       if (error instanceof EingabeFehler) return res.status(400).json({ fehler: error.message });
       throw error;
     }
 
     // Erst im Hintergrund ablegen, dann erzeugen: auch Dateien, die nicht klappen, bleiben als Übungsmaterial
-    const id = crypto.randomUUID();
-    const relativ = path.join("uploads", req.mandant.id, `${id}.bpmn`);
-    try {
-      fs.mkdirSync(path.join(datenDir, "uploads", req.mandant.id), { recursive: true });
-      fs.writeFileSync(path.join(datenDir, relativ), inhalt);
-    } catch (error) {
-      console.error("Upload nicht abgelegt:", error);
-    }
+    const vorgang = crypto.randomUUID();
+    const abgelegt = dateien.map((d) => {
+      const id = crypto.randomUUID();
+      const relativ = path.join("uploads", req.mandant.id, `${id}.bpmn`);
+      try {
+        fs.mkdirSync(path.join(datenDir, "uploads", req.mandant.id), { recursive: true });
+        fs.writeFileSync(path.join(datenDir, relativ), d.inhalt);
+      } catch (error) {
+        console.error("Upload nicht abgelegt:", error);
+      }
+      return { ...d, id, relativ };
+    });
 
     let pdf = null;
     let meldung = "";
     try {
-      pdf = await erzeugeHandbuch(inhalt.toString("utf8").replace(/^﻿/, ""), {
+      pdf = await erzeugeHandbuch(dateien.map((d) => ({ name: d.name, xml: d.inhalt })), {
         name: titel,
         stand: datumHeute(),
         organisation: req.mandant.name,
@@ -103,12 +114,16 @@ function router({ db, kern, datenDir }) {
     }
 
     const status = pdf ? "ok" : "fehler";
-    try {
-      ablegen.run(id, req.mandant.id, dateiname, titel, relativ, inhalt.length, status, meldung, new Date().toISOString());
-    } catch (error) {
-      console.error("Upload nicht vermerkt:", error);
+    const zeit = new Date().toISOString();
+    for (const d of abgelegt) {
+      try {
+        ablegen.run(d.id, vorgang, req.mandant.id, d.name, titel, d.relativ, Buffer.byteLength(d.inhalt), status, meldung, zeit);
+      } catch (error) {
+        console.error("Upload nicht vermerkt:", error);
+      }
     }
-    kern.protokolliere({ mandantId: req.mandant.id, modulId: "handbuch", aktion: "handbuch erstellt", ergebnis: status, details: `${dateiname}${meldung ? `: ${meldung}` : ""}` });
+    const namen = dateien.map((d) => d.name).join(", ");
+    kern.protokolliere({ mandantId: req.mandant.id, modulId: "handbuch", aktion: "handbuch erstellt", ergebnis: status, details: `${namen}${meldung ? `: ${meldung}` : ""}` });
 
     if (!pdf) return res.status(422).json({ fehler: meldung });
     const datei = `${titel.replace(/[^\p{L}\p{N} _-]/gu, "").trim() || "Prozess"} Handbuch.pdf`;
@@ -123,7 +138,7 @@ function router({ db, kern, datenDir }) {
 export default {
   id: "handbuch",
   name: "Logbuch",
-  beschreibung: "BPMN-Modell hochladen, Titel eingeben und ein Handbuch als PDF erstellen.",
+  beschreibung: "BPMN-Modell hochladen (auch mehrere Dateien), Titel eingeben und ein Handbuch als PDF erstellen.",
   migrationen: MIGRATIONEN,
   oberflaeche: path.join(path.dirname(fileURLToPath(import.meta.url)), "oberflaeche"),
   router

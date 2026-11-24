@@ -164,3 +164,37 @@ test("PICTURE: PDF mit Bahnen unter dem Teilprozess und Hinweisen statt leerer S
   const pdf = await erzeugeHandbuch(picture, { stand: "24.11.2026" });
   assert.equal(Buffer.from(pdf).subarray(0, 5).toString(), "%PDF-");
 });
+
+// Mehrere Dateien: PICTURE exportiert teils je Diagramm eine Datei
+const geteiltHaupt = fs.readFileSync(path.join(__dirname, "fixtures", "picture-geteilt-haupt.bpmn"), "utf8");
+const geteiltUnter = fs.readFileSync(path.join(__dirname, "fixtures", "picture-geteilt-unterdiagramm.bpmn"), "utf8");
+
+test("Mehrere Dateien: nur das Hauptdiagramm ergibt den Hinweis auf das fehlende Unterdiagramm", async () => {
+  const { kapitel } = await leseHandbuch(geteiltHaupt);
+  const anfrage = kapitel[0].eintraege[0];
+  assert.equal(anfrage.name, "Anfrage bearbeiten");
+  assert.equal(anfrage.hinweis, "Siehe Modell „Anfrage bearbeiten“");
+  assert.deepEqual(anfrage.eintraege, []);
+});
+
+test("Mehrere Dateien: Unterdiagramm aus anderer Datei wird eingehängt, Reihenfolge der Dateien egal", async () => {
+  const zusammen = await leseHandbuch([{ name: "unter.bpmn", xml: geteiltUnter }, { name: "haupt.bpmn", xml: geteiltHaupt }]);
+  const eineDatei = await leseHandbuch(picture);
+  assert.deepEqual(zusammen.kapitel.map((k) => ({ titel: k.titel, eintraege: k.eintraege.map(gliederung) })),
+    eineDatei.kapitel.map((k) => ({ titel: k.titel, eintraege: k.eintraege.map(gliederung) })));
+  assert.equal(zusammen.titel, "Seminar durchführen");
+});
+
+test("Mehrere Dateien: weitere Prozesse als eigene Kapitel mit Zusatz, gleiche IDs stören nicht", async () => {
+  const einzeln = await leseHandbuch(teilprozesse);
+  const doppelt = await leseHandbuch([teilprozesse, teilprozesse]);
+  assert.equal(doppelt.kapitel.length, einzeln.kapitel.length * 2);
+  assert.deepEqual(doppelt.kapitel.slice(0, einzeln.kapitel.length).map((k) => k.titel), einzeln.kapitel.map((k) => k.titel));
+  assert.ok(doppelt.kapitel.slice(einzeln.kapitel.length).every((k, i) => k.titel === `${einzeln.kapitel[i].titel} (Stadtkasse)`));
+  assert.deepEqual(doppelt.kapitel[einzeln.kapitel.length].eintraege.map(gliederung), einzeln.kapitel[0].eintraege.map(gliederung));
+});
+
+test("Mehrere Dateien: kaputte Datei wird mit Namen gemeldet", async () => {
+  await assert.rejects(leseHandbuch([{ name: "gut.bpmn", xml: geteiltHaupt }, { name: "kaputt.bpmn", xml: "<kein xml" }]), /„kaputt\.bpmn“/);
+  await assert.rejects(leseHandbuch([]), HandbuchFehler);
+});

@@ -1,4 +1,4 @@
-// Logbuch: BPMN-Datei und Titel rein, Knopf, Handbuch als PDF raus
+// Logbuch: BPMN-Datei(en) und Titel rein, Knopf, Handbuch als PDF raus (mehrere Dateien werden zusammengeführt)
 (function () {
   "use strict";
   const { zeigeMeldung, api, abmelden } = Portal;
@@ -7,10 +7,10 @@
   const titelFeld = document.getElementById("titel");
   const ablage = document.getElementById("ablage");
   const eingabe = document.getElementById("datei");
-  let datei = null;
+  let dateien = [];
 
   function pruefeKnopf() {
-    knopf.disabled = !datei || !titelFeld.value.trim();
+    knopf.disabled = !dateien.length || !titelFeld.value.trim();
   }
 
   // Titelvorschlag aus dem Dateinamen, solange der Anwender nichts eingegeben hat
@@ -18,13 +18,15 @@
     return name.replace(/\.(bpmn|xml)$/i, "").replace(/_+/g, " ").replace(/\s+/g, " ").trim();
   }
 
-  function waehle(neu) {
-    if (!neu) return;
-    datei = neu;
+  // Auswahl ersetzt die vorige; sortiert nach Namen (bei PICTURE steht das Hauptdiagramm meist vorn)
+  function waehle(liste) {
+    const neu = [...(liste || [])].sort((a, b) => a.name.localeCompare(b.name, "de"));
+    if (!neu.length) return;
+    dateien = neu;
     ablage.classList.add("gewaehlt");
-    document.getElementById("ablage-titel").textContent = neu.name;
-    document.getElementById("ablage-text").textContent = "Andere Datei? Hier ablegen oder klicken.";
-    if (!titelFeld.value.trim()) titelFeld.value = titelVorschlag(neu.name);
+    document.getElementById("ablage-titel").textContent = neu.length === 1 ? neu[0].name : `${neu.length} Dateien ausgewählt`;
+    document.getElementById("ablage-text").textContent = `${neu.length > 1 ? `${neu.map((d) => d.name).join(", ")}. ` : ""}Andere Auswahl? Hier ablegen oder klicken.`;
+    if (!titelFeld.value.trim()) titelFeld.value = titelVorschlag(neu[0].name);
     meldung("");
     pruefeKnopf();
   }
@@ -42,21 +44,18 @@
 
   document.getElementById("form-erstellen").addEventListener("submit", async (event) => {
     event.preventDefault();
-    if (!datei || !titelFeld.value.trim()) return;
+    if (!dateien.length || !titelFeld.value.trim()) return;
     const titel = titelFeld.value.trim();
     knopf.disabled = true;
     knopf.textContent = "Handbuch wird erstellt ...";
     meldung("");
     try {
+      const inhalte = await Promise.all(dateien.map(async (d) => ({ name: d.name, inhalt: await d.text() })));
       const res = await fetch("/api/m/handbuch/erstellen", {
         method: "POST",
         credentials: "same-origin",
-        headers: {
-          "Content-Type": "application/octet-stream",
-          "X-Dateiname": encodeURIComponent(datei.name),
-          "X-Titel": encodeURIComponent(titel)
-        },
-        body: datei
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ titel, dateien: inhalte })
       });
       if (res.status === 401 || res.status === 403) {
         location.href = "/";
@@ -78,7 +77,7 @@
 
   titelFeld.addEventListener("input", pruefeKnopf);
   eingabe.addEventListener("change", () => {
-    waehle(eingabe.files[0]);
+    waehle(eingabe.files);
     eingabe.value = "";
   });
   ablage.addEventListener("dragover", (e) => { e.preventDefault(); ablage.classList.add("ueber"); });
@@ -86,7 +85,7 @@
   ablage.addEventListener("drop", (e) => {
     e.preventDefault();
     ablage.classList.remove("ueber");
-    waehle(e.dataTransfer.files[0]);
+    waehle(e.dataTransfer.files);
   });
   document.getElementById("btn-abmelden").addEventListener("click", abmelden);
 

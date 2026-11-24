@@ -24,7 +24,7 @@
     .ablage.ueber { border-color: var(--sky); background: rgba(2, 132, 199, 0.06); }
     .ablage.gewaehlt { border-style: solid; border-color: var(--sky); }
     .ablage strong { display: block; font-size: 16px; margin-bottom: 4px; overflow-wrap: anywhere; }
-    .ablage p { margin: 0; color: var(--text-muted); font-size: 14px; }
+    .ablage p { margin: 0; color: var(--text-muted); font-size: 14px; overflow-wrap: anywhere; }
     .erstellen .btn-primaer { width: 100%; margin-top: 18px; padding: 11px 14px; font-size: 15px; }
   </style>
 </head>
@@ -45,9 +45,9 @@
     <form class="karte erstellen" id="form-erstellen">
       <label class="ablage" id="ablage" for="datei">
         <strong id="ablage-titel">BPMN-Datei hier ablegen oder auswählen</strong>
-        <p id="ablage-text">Export aus ADONIS, PICTURE oder einem anderen Werkzeug, Endung .bpmn oder .xml</p>
+        <p id="ablage-text">Export aus ADONIS, PICTURE oder einem anderen Werkzeug, Endung .bpmn oder .xml. Auch mehrere Dateien, etwa Haupt- und Unterdiagramme.</p>
       </label>
-      <input type="file" id="datei" accept=".bpmn,.xml" hidden>
+      <input type="file" id="datei" accept=".bpmn,.xml" multiple hidden>
 
       <label for="titel">Titel des Handbuchs</label>
       <input type="text" id="titel" maxlength="150" placeholder="z. B. Antrag auf Teilzeit bearbeiten" required>

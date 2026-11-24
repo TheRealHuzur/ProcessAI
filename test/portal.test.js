@@ -129,7 +129,7 @@ test("Freischalten je Mandant und Modul, Lizenz test oder voll", async () => {
 });
 
 test("Logbuch: Datei und Titel rein, PDF raus; jede Datei bleibt im Hintergrund auf dem Server", async () => {
-  const erstelle = (client, inhalt, name, titel) => client("/api/m/handbuch/erstellen", { method: "POST", roh: inhalt, headers: { "X-Dateiname": encodeURIComponent(name), ...(titel ? { "X-Titel": encodeURIComponent(titel) } : {}) } });
+  const erstelle = (client, inhalt, name, titel) => client("/api/m/handbuch/erstellen", { method: "POST", body: { titel, dateien: [{ name, inhalt }] } });
   const pdf = await erstelle(amtA, teilprozesse, "Rechnung_bezahlen.bpmn", "Rechnung bezahlen in der Stadtkasse");
   assert.equal(pdf.status, 200);
   assert.equal(pdf.headers.get("content-type"), "application/pdf");
@@ -161,6 +161,33 @@ test("Logbuch: Datei und Titel rein, PDF raus; jede Datei bleibt im Hintergrund 
   assert.equal((await amtA("/api/m/handbuch/uploads")).status, 404);
 });
 
+test("Logbuch: mehrere Dateien zu einem Handbuch, jede Datei abgelegt, gemeinsamer Vorgang", async () => {
+  const fixture = (n) => fs.readFileSync(path.join(__dirname, "fixtures", n), "utf8");
+  const dateien = [
+    { name: "PICTURE_Unterdiagramm.bpmn", inhalt: fixture("picture-geteilt-unterdiagramm.bpmn") },
+    { name: "PICTURE_Hauptdiagramm.bpmn", inhalt: fixture("picture-geteilt-haupt.bpmn") }
+  ];
+  const vorher = fs.readdirSync(path.join(tmp, "module", "handbuch", "uploads", idA)).length;
+  const pdf = await amtA("/api/m/handbuch/erstellen", { method: "POST", body: { titel: "Seminar", dateien } });
+  assert.equal(pdf.status, 200);
+  assert.equal(pdf.daten.subarray(0, 5).toString(), "%PDF-");
+  assert.equal(fs.readdirSync(path.join(tmp, "module", "handbuch", "uploads", idA)).length, vorher + 2);
+  const db = oeffnePortalDatenbank(tmp, [...MODULE, notizen]);
+  const zeilen = db.prepare("SELECT vorgang, dateiname FROM hb_uploads WHERE titel = 'Seminar'").all();
+  const gesamt = db.prepare("SELECT COUNT(*) AS zeilen, COUNT(DISTINCT vorgang) AS vorgaenge FROM hb_uploads").get();
+  db.close();
+  assert.equal(zeilen.length, 2);
+  assert.equal(new Set(zeilen.map((z) => z.vorgang)).size, 1);
+  assert.equal(gesamt.zeilen - gesamt.vorgaenge, 1, "nur die zwei Dateien dieses Aufrufs teilen sich einen Vorgang");
+
+  const kaputt = await amtA("/api/m/handbuch/erstellen", { method: "POST", body: { titel: "X", dateien: [dateien[0], { name: "Kaputt.bpmn", inhalt: "<kein" }] } });
+  assert.equal(kaputt.status, 422);
+  assert.match(kaputt.daten.fehler, /„Kaputt\.bpmn“/);
+  assert.equal((await amtA("/api/m/handbuch/erstellen", { method: "POST", body: { titel: "X", dateien: [] } })).status, 400);
+  const zuViele = Array.from({ length: 21 }, (_, i) => ({ name: `d${i}.bpmn`, inhalt: "<x/>" }));
+  assert.equal((await amtA("/api/m/handbuch/erstellen", { method: "POST", body: { titel: "X", dateien: zuViele } })).status, 400);
+});
+
 test("Weiteres Modul ohne Änderung am Kontokern: freischalten, eigene Daten je Mandant", async () => {
   assert.equal((await amtA("/api/m/notizen")).status, 403);
   await admin(`/api/verwaltung/mandanten/${idA}/module/notizen`, { method: "PUT", body: { an: true } });
@@ -178,7 +205,7 @@ test("Weiteres Modul ohne Änderung am Kontokern: freischalten, eigene Daten je 
 test("Migrationen je Bereich: erneutes Öffnen ändert nichts, neues Modul kommt dazu", () => {
   const db = oeffnePortalDatenbank(tmp, [...MODULE, notizen]);
   const stand = db.prepare("SELECT bereich, version FROM schema_stand ORDER BY bereich").all().map((z) => [z.bereich, z.version]);
-  assert.deepEqual(stand, [["konten", 1], ["modul:handbuch", 1], ["modul:notizen", 1]]);
+  assert.deepEqual(stand, [["konten", 1], ["modul:handbuch", 2], ["modul:notizen", 1]]);
   db.close();
 });
 

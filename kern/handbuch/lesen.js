@@ -6,7 +6,7 @@
 // ohne Datenbank, Anmeldung, Einstellungen oder KI.
 import BpmnModdle from "bpmn-moddle";
 import "../../public/wissen.js";
-import { pictureTeilprozesse, pictureBeschreibung, pictureAufrufZiel, pictureHatUnterdiagramm } from "./picture.js";
+import { pictureTeilprozesse, pictureBeschreibung, pictureAufrufZiel, pictureHatUnterdiagramm, prozesseDerDiagramme } from "./picture.js";
 
 const PPWissen = globalThis.PPWissen;
 
@@ -49,23 +49,39 @@ function lagen(definitions) {
   const lage = new Map();
   for (const diagramm of definitions.diagrams || []) {
     for (const form of (diagramm.plane && diagramm.plane.planeElement) || []) {
-      if (form.bpmnElement && form.bounds) lage.set(form.bpmnElement.id, form.bounds);
+      if (form.bpmnElement && form.bounds) lage.set(form.bpmnElement, form.bounds);
     }
   }
   return lage;
 }
 
+// Eine Datei als XML-Text oder mehrere als Liste (Texte oder { name, xml }). Mehrere Dateien werden
+// zusammengeführt: Teilprozesse finden ihren Inhalt auch in einer anderen Datei (PICTURE exportiert
+// teils je Diagramm eine Datei). Der Hauptprozess ist der, der die meisten anderen einbindet.
+async function lies(dateien) {
+  const liste = (Array.isArray(dateien) ? dateien : [dateien]).map((d) => (typeof d === "string" ? { name: "", xml: d } : d));
+  if (!liste.length) throw new HandbuchFehler("Es wurde keine Datei übergeben.");
+  const alle = [];
+  for (const d of liste) {
+    try {
+      const { rootElement } = await new BpmnModdle({ pp: PPWissen.descriptor }).fromXML(String(d.xml || ""));
+      alle.push(rootElement);
+    } catch {
+      throw new HandbuchFehler(liste.length > 1 && d.name ? `Die Datei „${d.name}“ ist kein gültiges BPMN-XML.` : "Das Modell ist kein gültiges BPMN-XML.");
+    }
+  }
+  return {
+    mehrere: alle.length > 1,
+    definitions: { rootElements: alle.flatMap((d) => d.rootElements || []), diagrams: alle.flatMap((d) => d.diagrams || []) }
+  };
+}
+
 // Aus dem XML die Gliederung des Handbuchs lesen
 export async function leseHandbuch(xml) {
-  let definitions;
-  try {
-    ({ rootElement: definitions } = await new BpmnModdle({ pp: PPWissen.descriptor }).fromXML(xml));
-  } catch {
-    throw new HandbuchFehler("Das Modell ist kein gültiges BPMN-XML.");
-  }
+  const { definitions, mehrere } = await lies(xml);
   const lage = lagen(definitions);
   const sortiert = (liste) => liste
-    .map((bo, i) => ({ bo, i, b: lage.get(bo.id) }))
+    .map((bo, i) => ({ bo, i, b: lage.get(bo) }))
     .sort((a, b) => (a.b ? 0 : 1) - (b.b ? 0 : 1) || (a.b && b.b ? a.b.x - b.b.x || a.b.y - b.b.y : 0) || a.i - b.i)
     .map((x) => x.bo);
 
@@ -102,7 +118,7 @@ export async function leseHandbuch(xml) {
     const teilprozess = istTeilprozess(bo);
     let eintraege = [];
     if (teilprozess) {
-      const container = (bo.flowElements || []).some(istAktivitaet) ? bo : teilprozessInhalt.get(bo.id);
+      const container = (bo.flowElements || []).some(istAktivitaet) ? bo : teilprozessInhalt.get(bo);
       if (container && !besucht.has(container)) eintraege = inhalt(container, new Set([...besucht, container]));
     }
     return {
@@ -118,18 +134,34 @@ export async function leseHandbuch(xml) {
     };
   }
 
-  const kollaboration = wurzeln.find((r) => r.$type === "bpmn:Collaboration");
-  const teilnehmerVon = new Map(((kollaboration && kollaboration.participants) || []).filter((p) => p.processRef).map((p) => [p.processRef.id, p]));
+  const kollaborationen = wurzeln.filter((r) => r.$type === "bpmn:Collaboration");
+  const kollaboration = kollaborationen[0];
+  const teilnehmerVon = new Map(kollaborationen.flatMap((k) => k.participants || []).filter((p) => p.processRef).map((p) => [p.processRef, p]));
   const mitSchritten = alleProzesse.filter((r) => (r.flowElements || []).some(istAktivitaet));
   const hauptprozesse = mitSchritten.filter((r) => !inhaltsProzesse.has(r));
-  const prozesse = hauptprozesse.length ? hauptprozesse : mitSchritten;
+  // Bei mehreren Dateien zuerst der Prozess, der die meisten Teilprozesse aus anderen Diagrammen einbindet
+  const einbindungen = new Map();
+  const { prozessVon, prozessImDiagramm } = prozesseDerDiagramme(definitions);
+  for (const tp of teilprozessInhalt.keys()) {
+    const p = prozessVon.get(tp);
+    if (p) einbindungen.set(p, (einbindungen.get(p) || 0) + 1);
+  }
+  const prozesse = (hauptprozesse.length ? hauptprozesse : mitSchritten)
+    .map((p, i) => ({ p, i }))
+    .sort((a, b) => (mehrere ? (einbindungen.get(b.p) || 0) - (einbindungen.get(a.p) || 0) : 0) || a.i - b.i)
+    .map((x) => x.p);
+  // Name eines Prozesses für Kapitelzusätze: bei mehreren Dateien der Diagrammname, sonst der Pool
+  const diagrammName = new Map([...prozessImDiagramm].filter(([d]) => einzeilig(d.name)).map(([d, p]) => [p, einzeilig(d.name)]));
 
   const kapitel = [];
   let einfuehrung = "";
-  for (const prozess of prozesse) {
-    const teilnehmer = teilnehmerVon.get(prozess.id);
+  for (const [nr, prozess] of prozesse.entries()) {
+    const teilnehmer = teilnehmerVon.get(prozess);
     const poolName = einzeilig((teilnehmer && teilnehmer.name) || prozess.name);
-    const zusatz = prozesse.length > 1 && poolName ? ` (${poolName})` : "";
+    // Eine Datei: wie bisher alle Kapitel mit Poolnamen, wenn es mehrere Pools gibt.
+    // Mehrere Dateien: der Hauptprozess ohne Zusatz, weitere mit ihrem Diagrammnamen.
+    const zusatzName = mehrere ? (nr === 0 ? "" : diagrammName.get(prozess) || poolName) : (prozesse.length > 1 ? poolName : "");
+    const zusatz = zusatzName ? ` (${zusatzName})` : "";
     if (!einfuehrung) einfuehrung = (teilnehmer && arbeitshilfe(teilnehmer)) || arbeitshilfe(prozess) || (kollaboration ? arbeitshilfe(kollaboration) : "");
 
     const aktivitaeten = (prozess.flowElements || []).filter(istAktivitaet);
@@ -149,7 +181,7 @@ export async function leseHandbuch(xml) {
   }
   if (!kapitel.length) throw new HandbuchFehler("Das Modell enthält noch keine Aufgaben oder Teilprozesse.");
 
-  const hauptTeilnehmer = prozesse.length ? teilnehmerVon.get(prozesse[0].id) : null;
+  const hauptTeilnehmer = prozesse.length ? teilnehmerVon.get(prozesse[0]) : null;
   const titel = einzeilig((hauptTeilnehmer && hauptTeilnehmer.name) || (prozesse[0] && prozesse[0].name));
   return { titel, einfuehrung, kapitel };
 }
