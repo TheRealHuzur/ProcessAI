@@ -6,7 +6,7 @@
 // ohne Datenbank, Anmeldung, Einstellungen oder KI.
 import BpmnModdle from "bpmn-moddle";
 import "../../public/wissen.js";
-import { pictureTeilprozesse, pictureBeschreibung, pictureAufrufZiel } from "./picture.js";
+import { pictureTeilprozesse, pictureBeschreibung, pictureAufrufZiel, pictureHatUnterdiagramm } from "./picture.js";
 
 const PPWissen = globalThis.PPWissen;
 
@@ -16,10 +16,15 @@ export function einzeilig(text) {
   return String(text || "").replace(/\s+/g, " ").trim();
 }
 
-// Text am Schritt: BPMN-Feld documentation, dazu das Beschreibungsfeld aus PICTURE
+// Text am Schritt: BPMN-Feld documentation; nur wenn es fehlt, das Beschreibungsfeld aus PICTURE
+// (PICTURE exportiert die Beschreibung in beide Felder, einmal schlicht, einmal als HTML)
+// Einrückung der ersten Zeile bleibt erhalten, sonst wird ein " - Punkt" am Anfang zur höheren Listenebene
+function ohneRaender(text) {
+  return text.trim() ? text.replace(/^(?:[ \t]*\r?\n)+/, "").replace(/\s+$/, "") : "";
+}
+
 function arbeitshilfe(bo) {
-  const teile = [(bo.documentation || []).map((d) => d.text || "").join("\n\n").trim(), pictureBeschreibung(bo)];
-  return [...new Set(teile.filter(Boolean))].join("\n\n");
+  return ohneRaender((bo.documentation || []).map((d) => d.text || "").join("\n\n")) || pictureBeschreibung(bo);
 }
 
 function istAktivitaet(bo) {
@@ -105,7 +110,9 @@ export async function leseHandbuch(xml) {
       id: bo.id,
       name: einzeilig(bo.name),
       arbeitshilfe: arbeitshilfe(bo),
-      hinweis: bo.$instanceOf("bpmn:CallActivity") && !eintraege.length ? `Siehe Modell „${aufrufName(bo) || "ohne Namen"}“` : "",
+      hinweis: !eintraege.length && (bo.$instanceOf("bpmn:CallActivity") || pictureHatUnterdiagramm(bo))
+        ? `Siehe Modell „${(bo.$instanceOf("bpmn:CallActivity") ? aufrufName(bo) : einzeilig(bo.name)) || "ohne Namen"}“`
+        : "",
       wissen: PPWissen.lesen(bo),
       eintraege
     };

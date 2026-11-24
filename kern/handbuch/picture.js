@@ -32,12 +32,47 @@ export function pictureFelder(bo) {
   return felder;
 }
 
-// Beschreibung eines Schritts: nur das Beschreibungsfeld (Patrick, 24.11.2026), keine anderen Textfelder
+const ENTITAETEN = { amp: "&", lt: "<", gt: ">", quot: "\"", apos: "'", nbsp: " " };
+
+// Formatierter Text aus PICTURE (HTML) als schlichter Text; Aufzählungen als " - " mit Einrückung je Ebene
+export function htmlZuText(html) {
+  let ebene = 0;
+  let text = String(html || "")
+    .replace(/<!\[CDATA\[|\]\]>/g, "")
+    .replace(/<\s*br\s*\/?>/gi, "\n")
+    .replace(/<\s*(\/?)\s*(ul|ol|li|p|div|h\d)\b[^>]*>/gi, (_, zu, tag) => {
+      tag = tag.toLowerCase();
+      if (tag === "ul" || tag === "ol") { ebene = Math.max(0, ebene + (zu ? -1 : 1)); return "\n"; }
+      if (tag === "li") return zu ? "\n" : `\n${" ".repeat(ebene)}- `;
+      return zu ? "\n" : (ebene ? "" : "\n");
+    })
+    .replace(/<[^>]+>/g, "")
+    .replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (m, e) => {
+      if (e[0] === "#") return String.fromCodePoint(e[1].toLowerCase() === "x" ? parseInt(e.slice(2), 16) : parseInt(e.slice(1), 10));
+      return ENTITAETEN[e.toLowerCase()] ?? m;
+    });
+  // Listenpunkt direkt nach seinem Absatz-Tag: "- \n" zu "- " zusammenziehen
+  text = text.replace(/(^|\n)(\s*- )\n+/g, "$1$2");
+  return text.split("\n").map((z) => z.replace(/\s+$/, "")).join("\n")
+    .replace(/\n{2,}(?=\s*- )/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/^(?:[ \t]*\n)+/, "")
+    .replace(/\s+$/, "");
+}
+
+// Beschreibung eines Schritts: nur das Beschreibungsfeld (Patrick, 24.11.2026), keine anderen Textfelder.
+// PICTURE schreibt denselben Text auch schlicht ins BPMN-Feld documentation; das hat Vorrang (lesen.js).
 export function pictureBeschreibung(bo) {
   return pictureFelder(bo)
     .filter((f) => f.typ !== "color" && f.wert && (/beschreibung|description/i.test(f.id) || /^beschreibung$/i.test(f.name.trim())))
-    .map((f) => f.wert)
+    .map((f) => (f.typ === "richtext" || /<\w/.test(f.wert) ? htmlZuText(f.wert) : f.wert))
+    .filter(Boolean)
     .join("\n\n");
+}
+
+// Teilprozess mit Verknüpfung auf ein Unterdiagramm (ob es in der Datei liegt, prüft pictureTeilprozesse)
+export function pictureHatUnterdiagramm(bo) {
+  return pictureFelder(bo).some((f) => f.id === "subDiagramLink" && f.referenzen.some((r) => r.uuid));
 }
 
 // Name des Modells, auf das eine Aufrufaktivität in PICTURE verweist (leer, wenn keine Verknüpfung)

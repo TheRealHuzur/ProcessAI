@@ -16,12 +16,61 @@ const FARBE = { akzent: "#0a7d94", text: "#0f1c2e", grau: "#4e6680", linie: "#c9
 
 const URL_MUSTER = /(https?:\/\/[^\s]+)/g;
 
+// Text mit anklickbaren Adressen; ohne Adresse bleibt es ein schlichter Text
+function textOderLinks(zeile) {
+  return /https?:\/\//.test(zeile) ? mitLinks(zeile) : zeile;
+}
+
 function mitLinks(zeile) {
   return zeile.split(URL_MUSTER).filter(Boolean).map((teil) => (/^https?:\/\//.test(teil) ? { text: teil, link: teil, color: FARBE.akzent } : teil));
 }
 
+const LISTENPUNKT = /^(\s*)[-–•*]\s+(.*)$/;
+
+// Aufzählungszeilen ("- Punkt", eingerückt "  - Unterpunkt") als verschachtelte Liste für pdfmake
+function liste(zeilen) {
+  const tiefen = zeilen.map((z) => z.einzug);
+  const stufen = [...new Set(tiefen)].sort((a, b) => a - b);
+  const wurzel = [];
+  const stapel = [wurzel];
+  for (const z of zeilen) {
+    const ebene = stufen.indexOf(z.einzug);
+    while (stapel.length > ebene + 1) stapel.pop();
+    while (stapel.length < ebene + 1) {
+      const unter = [];
+      const oben = stapel[stapel.length - 1];
+      oben.push({ ul: unter });
+      stapel.push(unter);
+    }
+    stapel[stapel.length - 1].push({ text: textOderLinks(z.text) });
+  }
+  return { ul: wurzel, style: "liste" };
+}
+
+// Text in Absätze und Aufzählungen zerlegen; leere Listenpunkte entfallen
 function absaetze(text) {
-  return text.split(/\n\s*\n/).map((absatz) => ({ text: absatz.trim(), style: "absatz" })).filter((a) => a.text);
+  const knoten = [];
+  for (const block of text.split(/\n\s*\n/)) {
+    let zeilen = [];
+    let punkte = [];
+    const fertigText = () => { if (zeilen.length) knoten.push({ text: textOderLinks(zeilen.join("\n")), style: "absatz" }); zeilen = []; };
+    const fertigListe = () => { if (punkte.length) knoten.push(liste(punkte)); punkte = []; };
+    for (const zeile of block.split("\n")) {
+      const treffer = zeile.match(LISTENPUNKT);
+      if (treffer) {
+        fertigText();
+        if (treffer[2].trim()) punkte.push({ einzug: treffer[1].replace(/\t/g, "  ").length, text: treffer[2].trim() });
+      } else if (zeile.trim() === "-") {
+        continue;
+      } else if (zeile.trim()) {
+        fertigListe();
+        zeilen.push(zeile.trim());
+      }
+    }
+    fertigText();
+    fertigListe();
+  }
+  return knoten;
 }
 
 function ueberschrift(nummer, text, ebene) {

@@ -111,7 +111,8 @@ test("PICTURE: Teilprozess bekommt Inhalt aus dem verknüpften Diagramm, je Bahn
       ] },
       { art: "teilprozess", name: "Seminar durchführen", eintraege: [] },
       { art: "teilprozess", name: "Rechnung stellen", hinweis: "Siehe Modell „Rechnungswesen: Rechnung stellen“", eintraege: [] },
-      { art: "teilprozess", name: "Mahnverfahren durchführen", hinweis: "Siehe Modell „Mahnverfahren durchführen“", eintraege: [] }
+      { art: "teilprozess", name: "Mahnverfahren durchführen", hinweis: "Siehe Modell „Mahnverfahren durchführen“", eintraege: [] },
+      { art: "teilprozess", name: "Veranstaltung im NLC bearbeiten", hinweis: "Siehe Modell „Veranstaltung im NLC bearbeiten“", eintraege: [] }
     ]
   }]);
 });
@@ -120,7 +121,35 @@ test("PICTURE: nur das Beschreibungsfeld, keine Verbesserungsvorschläge, Nummer
   const { kapitel } = await leseHandbuch(picture);
   const [dozent] = kapitel[0].eintraege[0].eintraege;
   assert.equal(dozent.eintraege[0].arbeitshilfe, "Kalender auf freie Tage prüfen.");
-  assert.equal(dozent.eintraege[1].arbeitshilfe, "Zusage per Mail.");
+  assert.equal(dozent.eintraege[1].arbeitshilfe, "Zusage per Mail.", "documentation hat Vorrang, kein doppelter Text");
+  const eintragen = kapitel[0].eintraege[0].eintraege[1].eintraege[0];
+  assert.equal(eintragen.arbeitshilfe, "Eintragen in:\n - Kalender & Liste\n  - Outlook\n - Trello", "HTML-Beschreibung als Text, ohne Verbesserungsvorschläge");
+});
+
+test("Handbuch: Aufzählungen im Text werden zu verschachtelten Listen im PDF", () => {
+  const handbuch = { titel: "T", einfuehrung: "", kapitel: [{ titel: "K", eintraege: [{ art: "aufgabe", id: "a", name: "A", hinweis: "", wissen: {}, eintraege: [],
+    arbeitshilfe: "Vorab:\n - Punkt eins\n  - Unterpunkt\n - Punkt zwei https://example.org\n - \n\nSchluss." }] }] };
+  const inhalt = handbuchDokument(handbuch, { stand: "24.11.2026" }).content;
+  const start = inhalt.findIndex((k) => k.text === "Vorab:");
+  assert.ok(start > 0);
+  const listeKnoten = inhalt[start + 1];
+  assert.equal(listeKnoten.ul[0].text, "Punkt eins");
+  assert.deepEqual(listeKnoten.ul[1], { ul: [{ text: "Unterpunkt" }] });
+  assert.equal(listeKnoten.ul[2].text[1].link, "https://example.org");
+  assert.equal(listeKnoten.ul.length, 3, "leerer Listenpunkt entfällt");
+  assert.equal(inhalt[start + 2].text, "Schluss.");
+});
+
+test("Handbuch: Text, der mit einem eingerückten Listenpunkt beginnt, bleibt eine Ebene", async () => {
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL" id="D" targetNamespace="x">
+  <bpmn:process id="P"><bpmn:task id="T" name="Prüfen"><bpmn:documentation> - Erster Punkt
+ - Zweiter Punkt
+  - Unterpunkt</bpmn:documentation></bpmn:task></bpmn:process>
+</bpmn:definitions>`;
+  const handbuch = await leseHandbuch(xml);
+  const knoten = handbuchDokument(handbuch, { stand: "24.11.2026" }).content.find((k) => k.ul && k.style === "liste");
+  assert.deepEqual(knoten.ul, [{ text: "Erster Punkt" }, { text: "Zweiter Punkt" }, { ul: [{ text: "Unterpunkt" }] }]);
 });
 
 test("PICTURE: PDF mit Bahnen unter dem Teilprozess und Hinweisen statt leerer Stellen", async () => {
@@ -131,7 +160,7 @@ test("PICTURE: PDF mit Bahnen unter dem Teilprozess und Hinweisen statt leerer S
   }
   assert.ok(!texte.some((t) => /Geht das schneller/.test(t)));
   assert.equal(texte.filter((t) => t === "Schwimmbahn").length, 2);
-  assert.equal(texte.filter((t) => t === "Noch keine Arbeitshilfe hinterlegt.").length, 1, "nur Termin eintragen ist leer");
+  assert.equal(texte.filter((t) => t === "Noch keine Arbeitshilfe hinterlegt.").length, 0);
   const pdf = await erzeugeHandbuch(picture, { stand: "24.11.2026" });
   assert.equal(Buffer.from(pdf).subarray(0, 5).toString(), "%PDF-");
 });
