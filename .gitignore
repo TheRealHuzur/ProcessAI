@@ -13,6 +13,7 @@ data-portal/
 .env
 .env.*
 !.env.example
+!.env.portal.example
 
 # Logs und System
 *.log
