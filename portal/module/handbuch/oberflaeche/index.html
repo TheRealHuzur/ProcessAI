@@ -3,11 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Handbuch-Generator · Wissen und Werkzeug Portal</title>
+  <title>Logbuch · ProzessPilot</title>
   <meta name="robots" content="noindex, nofollow">
   <link rel="stylesheet" href="/portal.css">
   <style>
+    .erstellen { max-width: 620px; }
     .ablage {
+      display: block;
       border: 2px dashed var(--border);
       border-radius: 12px;
       padding: 28px 16px;
@@ -20,13 +22,15 @@
       color: var(--text);
     }
     .ablage.ueber { border-color: var(--sky); background: rgba(2, 132, 199, 0.06); }
-    .ablage strong { display: block; font-size: 16px; margin-bottom: 4px; }
+    .ablage.gewaehlt { border-style: solid; border-color: var(--sky); }
+    .ablage strong { display: block; font-size: 16px; margin-bottom: 4px; overflow-wrap: anywhere; }
     .ablage p { margin: 0; color: var(--text-muted); font-size: 14px; }
+    .erstellen .btn-primaer { width: 100%; margin-top: 18px; padding: 11px 14px; font-size: 15px; }
   </style>
 </head>
 <body>
   <header class="kopf">
-    <a class="marke" href="/">Wissen und Werkzeug <span>Portal</span></a>
+    <a class="marke" href="/">Prozess<span>Pilot</span></a>
     <div class="kopf-rechts">
       <span id="mandant-name"></span>
       <a class="btn btn-zweit btn-klein" href="/">Übersicht</a>
@@ -35,25 +39,22 @@
   </header>
 
   <main>
-    <h1>Handbuch-Generator</h1>
-    <p class="unterzeile">BPMN-Modell hochladen und daraus ein Handbuch als PDF erstellen. Eine neue Datei mit demselben Namen ersetzt die bisherige.</p>
+    <h1>Logbuch</h1>
+    <p class="unterzeile">BPMN-Datei hochladen, Titel eingeben, Handbuch erstellen.</p>
 
-    <div class="karte">
+    <form class="karte erstellen" id="form-erstellen">
       <label class="ablage" id="ablage" for="datei">
-        <strong>BPMN-Datei hier ablegen oder auswählen</strong>
-        <p>Export aus ADONIS, PICTURE oder einem anderen Werkzeug, Endung .bpmn oder .xml</p>
+        <strong id="ablage-titel">BPMN-Datei hier ablegen oder auswählen</strong>
+        <p id="ablage-text">Export aus ADONIS, PICTURE oder einem anderen Werkzeug, Endung .bpmn oder .xml</p>
       </label>
-      <input type="file" id="datei" accept=".bpmn,.xml" multiple hidden>
-      <div class="meldung" id="meldung" hidden></div>
-    </div>
+      <input type="file" id="datei" accept=".bpmn,.xml" hidden>
 
-    <h2>Ihre Modelle</h2>
-    <div class="karte tabelle-rahmen tabelle-stapel">
-      <table>
-        <thead><tr><th>Modell</th><th>Hochgeladen</th><th>Version</th><th>Prüfung</th><th></th></tr></thead>
-        <tbody id="liste"></tbody>
-      </table>
-    </div>
+      <label for="titel">Titel des Handbuchs</label>
+      <input type="text" id="titel" maxlength="150" placeholder="z. B. Antrag auf Teilzeit bearbeiten" required>
+
+      <button class="btn btn-primaer" id="btn-erstellen" type="submit" disabled>Handbuch erstellen</button>
+      <div class="meldung" id="meldung" hidden></div>
+    </form>
   </main>
 
   <div class="fuss">Wissen und Werkzeug · Testversion</div>

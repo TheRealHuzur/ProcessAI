@@ -1,67 +1,92 @@
-// Handbuch-Generator: hochladen, Liste der Modelle, Handbuch als PDF
+// Logbuch: BPMN-Datei und Titel rein, Knopf, Handbuch als PDF raus
 (function () {
   "use strict";
-  const { api, zeigeMeldung, datum, el, abmelden } = Portal;
-  const A = "/api/m/handbuch";
+  const { zeigeMeldung, api, abmelden } = Portal;
   const meldung = (text, art) => zeigeMeldung(document.getElementById("meldung"), text, art);
-
-  function zeigeListe(uploads) {
-    const body = document.getElementById("liste");
-    body.replaceChildren();
-    if (!uploads.length) {
-      body.append(el("tr", {}, el("td", { colspan: 5, class: "leer", text: "Noch keine Modelle hochgeladen." })));
-      return;
-    }
-    for (const u of uploads) {
-      const ok = u.status === "ok";
-      body.append(el("tr", {},
-        el("td", {}, el("strong", { text: u.titel || u.dateiname }), el("div", { class: "klein", text: u.dateiname })),
-        el("td", { class: "klein", "data-titel": "Hochgeladen", text: datum(u.hochgeladen) }),
-        el("td", { "data-titel": "Version", text: String(u.version) }),
-        el("td", {}, el("span", { class: ok ? "status-ok" : "status-fehler", text: ok ? "lesbar" : "nicht lesbar" }), u.meldung ? el("div", { class: "klein", text: u.meldung }) : null),
-        el("td", {}, ok
-          ? el("a", { class: "btn btn-primaer btn-klein", href: `${A}/uploads/${encodeURIComponent(u.id)}/handbuch.pdf`, text: "Handbuch (PDF)" })
-          : null)
-      ));
-    }
-  }
-
-  async function laden() {
-    const d = await api(`${A}/uploads`);
-    zeigeListe(d.uploads);
-  }
-
-  async function hochladen(dateien) {
-    const ergebnisse = [];
-    for (const datei of dateien) {
-      meldung(`Lade ${datei.name} hoch ...`, "ok");
-      try {
-        const d = await api(`${A}/uploads`, { method: "POST", roh: true, body: datei, headers: { "Content-Type": "application/octet-stream", "X-Dateiname": encodeURIComponent(datei.name) } });
-        ergebnisse.push(d.upload.status === "ok" ? `${datei.name}: hochgeladen.` : `${datei.name}: hochgeladen, aber nicht lesbar (${d.upload.meldung}).`);
-      } catch (error) {
-        if (error.status === 401 || error.status === 403) {
-          location.href = "/";
-          return;
-        }
-        ergebnisse.push(`${datei.name}: ${error.message}`);
-      }
-    }
-    meldung(ergebnisse.join(" "), ergebnisse.every((e) => e.endsWith("hochgeladen.")) ? "ok" : "fehler");
-    await laden();
-  }
-
+  const knopf = document.getElementById("btn-erstellen");
+  const titelFeld = document.getElementById("titel");
+  const ablage = document.getElementById("ablage");
   const eingabe = document.getElementById("datei");
+  let datei = null;
+
+  function pruefeKnopf() {
+    knopf.disabled = !datei || !titelFeld.value.trim();
+  }
+
+  // Titelvorschlag aus dem Dateinamen, solange der Anwender nichts eingegeben hat
+  function titelVorschlag(name) {
+    return name.replace(/\.(bpmn|xml)$/i, "").replace(/_+/g, " ").replace(/\s+/g, " ").trim();
+  }
+
+  function waehle(neu) {
+    if (!neu) return;
+    datei = neu;
+    ablage.classList.add("gewaehlt");
+    document.getElementById("ablage-titel").textContent = neu.name;
+    document.getElementById("ablage-text").textContent = "Andere Datei? Hier ablegen oder klicken.";
+    if (!titelFeld.value.trim()) titelFeld.value = titelVorschlag(neu.name);
+    meldung("");
+    pruefeKnopf();
+  }
+
+  function speichere(blob, name) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = name;
+    document.body.append(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
+  }
+
+  document.getElementById("form-erstellen").addEventListener("submit", async (event) => {
+    event.preventDefault();
+    if (!datei || !titelFeld.value.trim()) return;
+    const titel = titelFeld.value.trim();
+    knopf.disabled = true;
+    knopf.textContent = "Handbuch wird erstellt ...";
+    meldung("");
+    try {
+      const res = await fetch("/api/m/handbuch/erstellen", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: {
+          "Content-Type": "application/octet-stream",
+          "X-Dateiname": encodeURIComponent(datei.name),
+          "X-Titel": encodeURIComponent(titel)
+        },
+        body: datei
+      });
+      if (res.status === 401 || res.status === 403) {
+        location.href = "/";
+        return;
+      }
+      if (!res.ok) {
+        const daten = await res.json().catch(() => ({}));
+        throw new Error(daten.fehler || `Fehler ${res.status}`);
+      }
+      speichere(await res.blob(), `${titel.replace(/[\\/:*?"<>|]/g, "").trim() || "Prozess"} Handbuch.pdf`);
+      meldung("Das Handbuch ist erstellt und wird heruntergeladen.", "ok");
+    } catch (error) {
+      meldung(`Das Handbuch konnte nicht erstellt werden: ${error.message}`, "fehler");
+    } finally {
+      knopf.textContent = "Handbuch erstellen";
+      pruefeKnopf();
+    }
+  });
+
+  titelFeld.addEventListener("input", pruefeKnopf);
   eingabe.addEventListener("change", () => {
-    if (eingabe.files.length) hochladen([...eingabe.files]);
+    waehle(eingabe.files[0]);
     eingabe.value = "";
   });
-  const ablage = document.getElementById("ablage");
   ablage.addEventListener("dragover", (e) => { e.preventDefault(); ablage.classList.add("ueber"); });
   ablage.addEventListener("dragleave", () => ablage.classList.remove("ueber"));
   ablage.addEventListener("drop", (e) => {
     e.preventDefault();
     ablage.classList.remove("ueber");
-    if (e.dataTransfer.files.length) hochladen([...e.dataTransfer.files]);
+    waehle(e.dataTransfer.files[0]);
   });
   document.getElementById("btn-abmelden").addEventListener("click", abmelden);
 
@@ -71,6 +96,5 @@
       return;
     }
     document.getElementById("mandant-name").textContent = s.mandant.name;
-    laden().catch((error) => meldung(error.message, "fehler"));
   });
 })();

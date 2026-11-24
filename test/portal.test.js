@@ -128,36 +128,37 @@ test("Freischalten je Mandant und Modul, Lizenz test oder voll", async () => {
   assert.equal((await amtA("/m/handbuch/")).status, 200);
 });
 
-test("Handbuch: hochladen, ersetzen, PDF; alle Uploads bleiben auf dem Server", async () => {
-  const hoch = (inhalt, name) => amtA("/api/m/handbuch/uploads", { method: "POST", roh: inhalt, headers: { "X-Dateiname": encodeURIComponent(name) } });
-  const erster = await hoch(teilprozesse, "Rechnung_bezahlen.bpmn");
-  assert.equal(erster.status, 201);
-  assert.equal(erster.daten.upload.status, "ok");
-  assert.equal(erster.daten.upload.titel, "Rechnung bezahlen");
-  const zweiter = await hoch(teilprozesse, "rechnung_bezahlen.BPMN");
-  assert.equal(zweiter.daten.upload.version, 2);
-  const kaputt = await hoch("<kein bpmn", "Kaputt.bpmn");
-  assert.equal(kaputt.status, 201);
-  assert.equal(kaputt.daten.upload.status, "fehler");
-  assert.equal((await hoch(teilprozesse, "bild.png")).status, 400);
-  assert.equal((await hoch("", "leer.bpmn")).status, 400);
-
-  const liste = (await amtA("/api/m/handbuch/uploads")).daten.uploads;
-  assert.deepEqual(liste.map((u) => [u.dateiname, u.version]), [["Kaputt.bpmn", 1], ["rechnung_bezahlen.BPMN", 2]]);
-  const dateien = fs.readdirSync(path.join(tmp, "module", "handbuch", "uploads", idA));
-  assert.equal(dateien.length, 3);
-
-  const pdf = await amtA(`/api/m/handbuch/uploads/${zweiter.daten.upload.id}/handbuch.pdf`);
+test("Logbuch: Datei und Titel rein, PDF raus; jede Datei bleibt im Hintergrund auf dem Server", async () => {
+  const erstelle = (client, inhalt, name, titel) => client("/api/m/handbuch/erstellen", { method: "POST", roh: inhalt, headers: { "X-Dateiname": encodeURIComponent(name), ...(titel ? { "X-Titel": encodeURIComponent(titel) } : {}) } });
+  const pdf = await erstelle(amtA, teilprozesse, "Rechnung_bezahlen.bpmn", "Rechnung bezahlen in der Stadtkasse");
   assert.equal(pdf.status, 200);
   assert.equal(pdf.headers.get("content-type"), "application/pdf");
+  assert.match(pdf.headers.get("content-disposition"), /Rechnung%20bezahlen%20in%20der%20Stadtkasse%20Handbuch\.pdf/);
   assert.equal(pdf.daten.subarray(0, 5).toString(), "%PDF-");
-  assert.equal((await amtA(`/api/m/handbuch/uploads/${kaputt.daten.upload.id}/handbuch.pdf`)).status, 422);
-});
+  // Gleicher Name noch einmal: wieder ein PDF, nichts wird ersetzt oder angezeigt
+  assert.equal((await erstelle(amtA, teilprozesse, "Rechnung_bezahlen.bpmn")).status, 200);
+  const kaputt = await erstelle(amtA, "<kein bpmn", "Kaputt.bpmn", "Kaputt");
+  assert.equal(kaputt.status, 422);
+  assert.match(kaputt.daten.fehler, /kein gültiges BPMN/);
+  assert.equal((await erstelle(amtA, teilprozesse, "bild.png", "Bild")).status, 400);
+  assert.equal((await erstelle(amtA, "", "leer.bpmn", "Leer")).status, 400);
+  assert.equal((await erstelle(amtB, teilprozesse, "Anderer_Prozess.bpmn", "Anderer Prozess")).status, 200);
 
-test("Mandanten sehen nur ihre eigenen Daten", async () => {
-  const liste = (await amtA("/api/m/handbuch/uploads")).daten.uploads;
-  assert.deepEqual((await amtB("/api/m/handbuch/uploads")).daten.uploads, []);
-  assert.equal((await amtB(`/api/m/handbuch/uploads/${liste[0].id}/handbuch.pdf`)).status, 404);
+  // Im Hintergrund: alle Dateien je Mandant abgelegt und vermerkt, auch die kaputte
+  const ordner = (id) => fs.readdirSync(path.join(tmp, "module", "handbuch", "uploads", id));
+  assert.equal(ordner(idA).length, 3);
+  assert.equal(ordner(idB).length, 1);
+  const db = oeffnePortalDatenbank(tmp, [...MODULE, notizen]);
+  const zeilen = db.prepare("SELECT mandant_id, titel, status FROM hb_uploads ORDER BY hochgeladen").all();
+  db.close();
+  assert.deepEqual(zeilen.map((z) => [z.mandant_id === idA ? "A" : "B", z.titel, z.status]), [
+    ["A", "Rechnung bezahlen in der Stadtkasse", "ok"],
+    ["A", "Rechnung bezahlen", "ok"],
+    ["A", "Kaputt", "fehler"],
+    ["B", "Anderer Prozess", "ok"]
+  ]);
+  // Der Kunde sieht keine Liste früherer Dateien
+  assert.equal((await amtA("/api/m/handbuch/uploads")).status, 404);
 });
 
 test("Weiteres Modul ohne Änderung am Kontokern: freischalten, eigene Daten je Mandant", async () => {
@@ -188,7 +189,7 @@ test("Gesperrter Mandant und neues Passwort", async () => {
   await admin(`/api/verwaltung/mandanten/${idB}`, { method: "PATCH", body: { aktiv: true, passwort: "neues-pw-b2" } });
   assert.equal((await amtB("/api/anmelden", { method: "POST", body: { benutzername: "kreis-b", passwort: "neues-pw-b2" } })).status, 200);
   const p = await admin("/api/verwaltung/protokoll");
-  assert.ok(p.daten.eintraege.some((e) => e.aktion === "hochgeladen" && e.ergebnis === "fehler"));
+  assert.ok(p.daten.eintraege.some((e) => e.aktion === "handbuch erstellt" && e.ergebnis === "fehler"));
 });
 
 test("Titel aus Dateiname", () => {
