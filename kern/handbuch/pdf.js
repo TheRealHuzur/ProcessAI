@@ -104,7 +104,7 @@ function datumHeute() {
 }
 
 // Optionen: name (Titel statt Modellname), version, stand, organisation (über dem Titel),
-// erstelltMit (letzte Zeile auf dem Deckblatt), fusshinweis (Mitte der Fußzeile auf jeder Seite).
+// erstelltMit (letzte Zeile unten auf dem Deckblatt), fusshinweis (Mitte der Fußzeile auf jeder Seite).
 export function handbuchDokument(handbuch, {
   name = "",
   version = null,
@@ -120,17 +120,19 @@ export function handbuchDokument(handbuch, {
     ...(org ? [{ text: org, style: "deckOrganisation" }] : []),
     { text: titel, style: "deckTitel" },
     { canvas: [{ type: "line", x1: 0, y1: 0, x2: 120, y2: 0, lineWidth: 3, lineColor: FARBE.akzent }], margin: [0, 18, 0, 18] },
-    ...(handbuch.einfuehrung ? absaetze(handbuch.einfuehrung) : []),
-    {
-      stack: [
-        `Stand: ${stand}`,
-        ...(version ? [`Version ${version}`] : []),
-        ...(erstelltMit ? [erstelltMit] : [])
-      ],
-      style: "deckFuss",
-      margin: [0, 60, 0, 0]
-    }
+    ...(handbuch.einfuehrung ? absaetze(handbuch.einfuehrung) : [])
   ];
+  // Stand, Version und „Erstellt mit“ stehen unten auf dem Deckblatt, in dessen Fußzeile;
+  // so kann eine lange Einführung sie nie überdecken. Höchstens drei Zeilen passen in den unteren Rand.
+  const deckFuss = {
+    stack: [
+      `Stand: ${stand}`,
+      ...(version ? [`Version ${version}`] : []),
+      ...(erstelltMit ? [erstelltMit] : [])
+    ],
+    style: "deckFuss",
+    margin: [64, 6, 64, 0]
+  };
   const kapitel = handbuch.kapitel.flatMap((k, i) => {
     const nummer = String(i + 1);
     return [
@@ -150,7 +152,7 @@ export function handbuchDokument(handbuch, {
       { toc: { numberStyle: { color: FARBE.grau } } },
       ...kapitel
     ],
-    footer: (seite, seiten) => (seite === 1 ? null : {
+    footer: (seite, seiten) => (seite === 1 ? deckFuss : {
       columns: [
         { text: titel, color: FARBE.grau },
         ...(fusshinweis ? [{ text: fusshinweis, alignment: "center", color: FARBE.grau }] : []),
@@ -165,7 +167,7 @@ export function handbuchDokument(handbuch, {
       deckLabel: { fontSize: 13, bold: true, color: FARBE.akzent, characterSpacing: 1 },
       deckOrganisation: { fontSize: 12, color: FARBE.grau, margin: [0, 0, 0, 6] },
       deckTitel: { fontSize: 28, bold: true, lineHeight: 1.1 },
-      deckFuss: { fontSize: 10, color: FARBE.grau, lineHeight: 1.6 },
+      deckFuss: { fontSize: 10, color: FARBE.grau, lineHeight: 1.4 },
       kapitel: { fontSize: 18, bold: true, color: FARBE.akzent, margin: [0, 0, 0, 14] },
       abschnitt: { fontSize: 13, bold: true, margin: [0, 16, 0, 4] },
       unterabschnitt: { fontSize: 11.5, bold: true, margin: [0, 12, 0, 3] },

@@ -61,8 +61,12 @@ test("Handbuch: Gliederung im PDF mit Nummern und Inhaltsverzeichnis bis zur dri
     [2, "2.1  Zahlung freigeben", true]
   ]);
   const texte = JSON.stringify(dokument.content);
-  assert.ok(texte.includes("Version 3"));
-  assert.ok(texte.includes("Stand: 18.10.2026"));
+  const deckFuss = JSON.stringify(dokument.footer(1, 4));
+  assert.ok(deckFuss.includes("Version 3"));
+  assert.ok(deckFuss.includes("Stand: 18.10.2026"));
+  assert.ok(deckFuss.includes("Erstellt mit ProzessPilot"));
+  assert.ok(!texte.includes("Stand: 18.10.2026"), "Stand steht unten auf dem Deckblatt, nicht im Fließtext");
+  assert.ok(JSON.stringify(dokument.footer(2, 4)).includes("Seite 2 von 4"));
   assert.ok(texte.includes("Noch keine Arbeitshilfe hinterlegt."), "Aktivität ohne Arbeitshilfe wird als Lücke sichtbar");
   assert.ok(texte.includes('"link":"https://example.org/da-kasse"'));
   assert.ok(dokument.content.some((k) => k.toc));
