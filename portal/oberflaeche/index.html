@@ -3,94 +3,150 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>ProzessPilot</title>
+  <title>ProzessPilot · Ihre Werkzeuge</title>
   <meta name="robots" content="noindex, nofollow">
-  <link rel="stylesheet" href="/portal.css">
+  <!-- Design C3 nach docs/styleguide/STYLEGUIDE_ProzessPilot.md; Schriften lokal, keine Google-Server -->
+  <link rel="stylesheet" href="/stil/prozesspilot.css">
+  <style>
+    .anmeldung { max-width: 440px; min-height: 0; }
+    .anmeldung .pp-btn { align-self: center; margin-top: 18px; }
+    .anmeldung .pp-message { margin-top: 12px; }
+  </style>
 </head>
 <body>
-  <header class="kopf">
-    <a class="marke" href="/">Prozess<span>Pilot</span></a>
-    <div class="kopf-rechts" id="kopf-rechts" hidden>
-      <span id="mandant-name"></span>
-      <button class="btn btn-zweit btn-klein" id="btn-abmelden" type="button">Abmelden</button>
+<div class="pp-page">
+
+  <header class="pp-header">
+    <div class="pp-container pp-header__inner">
+      <a href="/" class="pp-wordmark">Prozess<span>Pilot</span></a>
+      <div class="pp-header__right" id="kopf-rechts" hidden>
+        <span class="pp-org" id="mandant-name"></span>
+        <button type="button" class="pp-btn pp-btn--text" id="btn-abmelden">Abmelden</button>
+      </div>
     </div>
   </header>
 
-  <main>
-    <section class="karte anmeldung" id="anmeldung" hidden>
-      <h1>Anmelden</h1>
-      <p class="unterzeile" style="text-align:center">Mit dem Zugang Ihrer Organisation.</p>
-      <form id="form-anmelden">
-        <label for="benutzername">Benutzername</label>
-        <input type="text" id="benutzername" autocomplete="username" required>
-        <label for="passwort">Passwort</label>
-        <input type="password" id="passwort" autocomplete="current-password" required>
-        <button class="btn btn-primaer" type="submit">Anmelden</button>
-        <div class="meldung" id="meldung-anmelden" hidden></div>
-      </form>
-    </section>
+  <section class="pp-band">
+    <div class="pp-container pp-band__inner">
+      <span class="pp-eyebrow" id="band-kicker"></span>
+      <h1>Willkommen im ProzessPilot</h1>
+      <p class="pp-band__lead" id="band-einleitung"></p>
+    </div>
+  </section>
 
-    <section id="uebersicht" hidden>
-      <h1>Ihre Werkzeuge</h1>
-      <p class="unterzeile">Diese Werkzeuge sind für Ihre Organisation freigeschaltet.</p>
-      <div class="kacheln" id="kacheln"></div>
-    </section>
+  <main class="pp-main">
+    <div class="pp-container">
+
+      <section class="pp-card anmeldung" id="anmeldung" aria-label="Anmeldung" hidden>
+        <form class="pp-form" id="form-anmelden">
+          <label class="pp-label" for="benutzername">Benutzername</label>
+          <input class="pp-field" type="text" id="benutzername" autocomplete="username" required>
+          <label class="pp-label" for="passwort">Passwort</label>
+          <input class="pp-field" type="password" id="passwort" autocomplete="current-password" required>
+          <button class="pp-btn pp-btn--primary" type="submit">Anmelden</button>
+          <div class="pp-message pp-message--error" id="meldung-anmelden" role="alert" hidden></div>
+        </form>
+      </section>
+
+      <div class="pp-cards" id="karten" hidden></div>
+
+    </div>
   </main>
 
-  <div class="fuss">Wissen und Werkzeug · Testversion</div>
+  <footer class="pp-footer">
+    <div class="pp-container pp-footer__inner">
+      <img src="/stil/logo-wissen-und-werkzeug.png" alt="Wissen und Werkzeug" width="150" height="50">
+      <span>Testversion</span>
+    </div>
+  </footer>
 
-  <script src="/portal.js"></script>
-  <script>
-    (function () {
-      "use strict";
-      const { api, zeigeMeldung, el, abmelden } = Portal;
+</div>
 
-      function zeigeUebersicht(daten) {
-        document.getElementById("anmeldung").hidden = true;
-        document.getElementById("uebersicht").hidden = false;
-        document.getElementById("kopf-rechts").hidden = false;
-        document.getElementById("mandant-name").textContent = daten.mandant.name;
-        const kacheln = document.getElementById("kacheln");
-        kacheln.replaceChildren();
-        if (!daten.module.length) {
-          kacheln.append(el("p", { class: "leer", text: "Für Ihren Zugang ist noch kein Werkzeug freigeschaltet." }));
-          return;
-        }
-        for (const m of daten.module) {
-          kacheln.append(el("a", { class: "karte kachel", href: m.adresse }, el("h3", { text: m.name }), el("p", { text: m.beschreibung })));
-        }
+<script src="/portal.js"></script>
+<script src="/stil/icons.js"></script>
+<script>
+  (function () {
+    "use strict";
+    const { api, el, abmelden } = Portal;
+    const KONTAKT = "patrick.rosskothen@wiundwe.de";
+
+    function band(kicker, einleitung) {
+      const k = document.getElementById("band-kicker");
+      k.textContent = kicker;
+      k.hidden = !kicker;
+      document.getElementById("band-einleitung").textContent = einleitung;
+    }
+
+    // Eine Werkzeugkarte je freigeschaltetem Modul; Daten aus dem Steckbrief (portal/module/)
+    function werkzeugkarte(m) {
+      return el("article", { class: "pp-card" },
+        PPIcons.icon(m.icon),
+        el("div", { class: "pp-card__title-row" },
+          el("h2", { text: m.name }),
+          el("span", { class: "pp-tag pp-tag--success", text: "Freigeschaltet" })),
+        el("p", { text: m.beschreibung }),
+        el("div", { class: "pp-card__action" },
+          el("a", { class: "pp-btn pp-btn--primary", href: m.adresse, text: m.knopf })));
+    }
+
+    // Kontaktkarte: immer die letzte Karte im Raster
+    function kontaktkarte() {
+      return el("div", { class: "pp-card pp-card--contact" },
+        PPIcons.icon("message"),
+        el("h2", { text: "Weitere Werkzeuge" }),
+        el("p", { text: "Wunsch nach weiteren Werkzeugen, Fehler oder Verbesserungsvorschläge? Bitte melden Sie sich." }),
+        el("a", { class: "pp-link-arrow", href: `mailto:${KONTAKT}`, text: "Kontakt aufnehmen →" }));
+    }
+
+    function zeigeUebersicht(daten) {
+      document.getElementById("anmeldung").hidden = true;
+      document.getElementById("kopf-rechts").hidden = false;
+      document.getElementById("mandant-name").textContent = daten.mandant.name;
+      band("Freigeschaltete Werkzeuge", daten.module.length
+        ? "Hier finden Sie alle Werkzeuge, die für Ihre Organisation freigeschaltet sind."
+        : "Für Ihre Organisation ist noch kein Werkzeug freigeschaltet.");
+      const karten = document.getElementById("karten");
+      karten.replaceChildren(...daten.module.map(werkzeugkarte), kontaktkarte());
+      karten.hidden = false;
+    }
+
+    function zeigeAnmeldung() {
+      document.getElementById("karten").hidden = true;
+      document.getElementById("kopf-rechts").hidden = true;
+      band("Anmeldung", "Melden Sie sich mit dem Zugang Ihrer Organisation an.");
+      document.getElementById("anmeldung").hidden = false;
+      document.getElementById("benutzername").focus();
+    }
+
+    function meldung(text) {
+      const m = document.getElementById("meldung-anmelden");
+      m.textContent = text || "";
+      m.hidden = !text;
+      for (const id of ["benutzername", "passwort"]) document.getElementById(id).classList.toggle("pp-field--error", Boolean(text));
+    }
+
+    document.getElementById("form-anmelden").addEventListener("submit", async (event) => {
+      event.preventDefault();
+      const knopf = event.target.querySelector("button");
+      knopf.disabled = true;
+      meldung("");
+      try {
+        const daten = await api("/api/anmelden", { method: "POST", body: {
+          benutzername: document.getElementById("benutzername").value,
+          passwort: document.getElementById("passwort").value
+        } });
+        document.getElementById("passwort").value = "";
+        zeigeUebersicht(daten);
+      } catch (error) {
+        meldung(error.message);
+      } finally {
+        knopf.disabled = false;
       }
+    });
+    document.getElementById("btn-abmelden").addEventListener("click", abmelden);
 
-      function zeigeAnmeldung() {
-        document.getElementById("uebersicht").hidden = true;
-        document.getElementById("kopf-rechts").hidden = true;
-        document.getElementById("anmeldung").hidden = false;
-        document.getElementById("benutzername").focus();
-      }
-
-      document.getElementById("form-anmelden").addEventListener("submit", async (event) => {
-        event.preventDefault();
-        const meldung = document.getElementById("meldung-anmelden");
-        const knopf = event.target.querySelector("button");
-        knopf.disabled = true;
-        zeigeMeldung(meldung, "");
-        try {
-          const daten = await api("/api/anmelden", { method: "POST", body: {
-            benutzername: document.getElementById("benutzername").value,
-            passwort: document.getElementById("passwort").value
-          } });
-          document.getElementById("passwort").value = "";
-          zeigeUebersicht(daten);
-        } catch (error) {
-          zeigeMeldung(meldung, error.message);
-        } finally {
-          knopf.disabled = false;
-        }
-      });
-      document.getElementById("btn-abmelden").addEventListener("click", abmelden);
-
-      api("/api/sitzung").then((d) => (d.angemeldet ? zeigeUebersicht(d) : zeigeAnmeldung())).catch(zeigeAnmeldung);
-    })();
-  </script>
+    api("/api/sitzung").then((d) => (d.angemeldet ? zeigeUebersicht(d) : zeigeAnmeldung())).catch(zeigeAnmeldung);
+  })();
+</script>
 </body>
 </html>

@@ -1,0 +1,159 @@
+/* ProzessPilot · Stilvorlage
+   Grundlage: CI Wissen & Werkzeug, Stand 25.11.2026
+   Regeln und Begründungen: docs/styleguide/STYLEGUIDE_ProzessPilot.md
+   Schriften Montserrat und Roboto lokal eingebunden (keine Google-Server, DSGVO).
+   Liegt in kern/stil/, damit Portal und KI-App dieselbe Vorlage nutzen; das Portal liefert sie unter /stil/ aus. */
+
+/* ---------- 0. Schriften (lokal, Fontsource, SIL Open Font License, siehe schriften/OFL-*.txt) ---------- */
+@font-face { font-family: "Montserrat"; font-style: normal; font-weight: 400; font-display: swap; src: url("schriften/montserrat-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "Montserrat"; font-style: normal; font-weight: 500; font-display: swap; src: url("schriften/montserrat-latin-500-normal.woff2") format("woff2"); }
+@font-face { font-family: "Montserrat"; font-style: normal; font-weight: 600; font-display: swap; src: url("schriften/montserrat-latin-600-normal.woff2") format("woff2"); }
+@font-face { font-family: "Montserrat"; font-style: normal; font-weight: 700; font-display: swap; src: url("schriften/montserrat-latin-700-normal.woff2") format("woff2"); }
+@font-face { font-family: "Roboto"; font-style: normal; font-weight: 400; font-display: swap; src: url("schriften/roboto-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "Roboto"; font-style: normal; font-weight: 500; font-display: swap; src: url("schriften/roboto-latin-500-normal.woff2") format("woff2"); }
+@font-face { font-family: "Roboto"; font-style: normal; font-weight: 700; font-display: swap; src: url("schriften/roboto-latin-700-normal.woff2") format("woff2"); }
+
+/* ---------- 1. Tokens ---------- */
+:root {
+  /* Farben */
+  --pp-navy: #2A314D;          /* Überschriften, Wortmarke, Firmenname */
+  --pp-teal: #0E97AD;          /* Aktionen, Links, Icons, Eyebrow, "Pilot" */
+  --pp-teal-hover: #097385;
+  --pp-teal-soft: #E5F4F6;     /* Band oben auf jeder Seite */
+  --pp-text: #484848;          /* Fließtext */
+  --pp-white: #FFFFFF;
+  --pp-grey-50: #F9F9F9;
+  --pp-border: #E3E4E8;        /* Trennlinien */
+  --pp-border-field: #B9BCC4;  /* Formularfelder, gestrichelte Karte */
+  --pp-success: #0E7A56;
+  --pp-success-soft: #E7F4EF;
+  --pp-error: #B3261E;
+  --pp-error-soft: #FBECEB;
+
+  /* Schrift */
+  --pp-font-heading: "Montserrat", "Segoe UI", sans-serif;
+  --pp-font-body: "Roboto", "Segoe UI", sans-serif;
+
+  /* Form und Tiefe */
+  --pp-radius: 8px;
+  --pp-radius-sm: 4px;
+  --pp-shadow-card: 0 5px 20px 2px rgba(0, 0, 0, 0.10);
+  --pp-shadow-card-hover: 0 12px 30px 2px rgba(11, 22, 42, 0.22);
+  --pp-shadow-button-hover: 0 8px 15px rgba(0, 0, 0, 0.20);
+  --pp-focus: 0 0 0 3px rgba(14, 151, 173, 0.25);
+  --pp-transition: 0.2s ease;
+
+  /* Raster */
+  --pp-container: 1140px;
+  --pp-gap: 28px;
+}
+
+/* ---------- 2. Grundlagen ---------- */
+*, *::before, *::after { box-sizing: border-box; }
+body {
+  margin: 0;
+  font-family: var(--pp-font-body);
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--pp-text);
+  background: var(--pp-white);
+  -webkit-font-smoothing: antialiased;
+}
+h1, h2, h3 { font-family: var(--pp-font-heading); font-weight: 700; color: var(--pp-navy); line-height: 1.2; margin: 0; }
+p { margin: 0; }
+a { color: var(--pp-teal); text-decoration: none; transition: color var(--pp-transition); }
+a:hover { color: var(--pp-teal-hover); }
+:focus-visible { outline: 2px solid var(--pp-teal); outline-offset: 2px; }
+[hidden] { display: none !important; }
+
+.pp-page { min-height: 100vh; display: flex; flex-direction: column; }
+.pp-container { max-width: var(--pp-container); margin: 0 auto; padding: 0 24px; }
+
+/* ---------- 3. Kopfzeile ---------- */
+.pp-header { border-bottom: 1px solid var(--pp-border); background: var(--pp-white); }
+.pp-header__inner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; padding-top: 18px; padding-bottom: 18px; }
+.pp-wordmark { font-family: var(--pp-font-heading); font-weight: 700; font-size: 24px; color: var(--pp-navy); }
+.pp-wordmark span { color: var(--pp-teal); }
+.pp-header__right { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }
+.pp-org { font-family: var(--pp-font-heading); font-weight: 600; font-size: 15px; color: var(--pp-navy); }
+
+/* ---------- 4. Band (Seitenkopf) ---------- */
+.pp-band { background: var(--pp-teal-soft); padding: 64px 0 140px; }
+.pp-band__inner { display: flex; flex-direction: column; gap: 14px; }
+.pp-eyebrow { font-family: var(--pp-font-heading); font-weight: 700; font-size: 18px; letter-spacing: 2px; text-transform: uppercase; color: var(--pp-teal); }
+.pp-band h1 { font-size: 44px; }
+.pp-band__lead { max-width: 620px; font-size: 19px; }
+/* Inhalt direkt nach dem Band ragt 96 px in das Band hinein */
+.pp-main { flex-grow: 1; padding-bottom: 72px; }
+.pp-main > .pp-container { margin-top: -96px; }
+
+/* ---------- 5. Kartenraster und Werkzeugkarte ---------- */
+/* Drei Karten je Reihe (Patrick, 25.11.2026): bei vier passt ein Button mit zwei Wörtern nicht einzeilig in die Karte */
+.pp-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(320px, 100%), 1fr)); gap: var(--pp-gap); }
+.pp-card {
+  min-height: 300px; padding: 28px 24px 24px;
+  display: flex; flex-direction: column; gap: 12px;
+  background: var(--pp-white); border-radius: var(--pp-radius);
+  box-shadow: var(--pp-shadow-card); transition: box-shadow var(--pp-transition);
+}
+.pp-card:hover { box-shadow: var(--pp-shadow-card-hover); }
+.pp-card__title-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.pp-card h2 { font-size: 24px; }
+.pp-card__action { margin-top: auto; padding-top: 8px; display: flex; justify-content: center; }
+
+/* Kontaktkarte: immer die letzte Karte im Raster */
+.pp-card--contact {
+  box-shadow: none; border: 2px dashed var(--pp-border-field);
+  justify-content: center; align-items: flex-start; gap: 14px; padding: 28px;
+}
+.pp-card--contact:hover { box-shadow: none; }
+.pp-card--contact h2 { font-size: 22px; }
+
+/* ---------- 6. Kleine Bausteine ---------- */
+.pp-icon { width: 34px; height: 34px; color: var(--pp-teal); flex-shrink: 0; }
+.pp-icon svg { width: 100%; height: 100%; display: block; }
+
+.pp-tag { padding: 4px 10px; border-radius: var(--pp-radius-sm); font-family: var(--pp-font-heading); font-weight: 600; font-size: 13px; }
+.pp-tag--success { background: var(--pp-success-soft); color: var(--pp-success); }
+
+.pp-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+  padding: 12px 24px; border-radius: var(--pp-radius); border: 1px solid transparent;
+  font-family: var(--pp-font-heading); font-weight: 600; font-size: 16px; line-height: 1.25;
+  cursor: pointer; text-decoration: none;
+  transition: background var(--pp-transition), color var(--pp-transition), box-shadow var(--pp-transition);
+}
+.pp-btn--primary { background: var(--pp-teal); color: var(--pp-white); }
+.pp-btn--primary:hover { background: var(--pp-teal-hover); color: var(--pp-white); box-shadow: var(--pp-shadow-button-hover); }
+.pp-btn--text { background: transparent; padding: 4px 0; color: var(--pp-teal); font-size: 15px; }
+.pp-btn--text:hover { color: var(--pp-teal-hover); }
+.pp-btn:focus-visible { outline: 1px solid var(--pp-teal); box-shadow: var(--pp-focus); }
+.pp-btn:disabled { opacity: 0.5; cursor: default; box-shadow: none; }
+
+.pp-link-arrow { font-family: var(--pp-font-heading); font-weight: 600; font-size: 15px; }
+
+/* ---------- 7. Fußzeile ---------- */
+.pp-footer { border-top: 1px solid var(--pp-border); padding: 24px 0; font-size: 14px; }
+.pp-footer__inner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; }
+.pp-footer img { width: 150px; height: auto; display: block; }
+
+/* ---------- 8. Mobil ---------- */
+@media (max-width: 767px) {
+  .pp-band { padding: 40px 0 120px; }
+  .pp-band h1 { font-size: 30px; }
+  .pp-band__lead { font-size: 17px; }
+}
+
+/* ---------- 9. Formulare und Meldungen (Ergänzung nach Styleguide Abschnitt 2 und 6) ---------- */
+.pp-form { display: flex; flex-direction: column; gap: 6px; }
+.pp-label { font-family: var(--pp-font-heading); font-weight: 600; font-size: 14px; color: var(--pp-navy); margin-top: 10px; }
+.pp-field {
+  width: 100%; font: inherit; color: var(--pp-text); background: var(--pp-white);
+  padding: 10px 12px; border: 1px solid var(--pp-border-field); border-radius: var(--pp-radius);
+  transition: border-color var(--pp-transition), box-shadow var(--pp-transition);
+}
+.pp-field:focus-visible { outline: 1px solid var(--pp-teal); border-color: var(--pp-teal); box-shadow: var(--pp-focus); }
+.pp-field--error { border-color: var(--pp-error); }
+.pp-message { padding: 10px 14px; border-radius: var(--pp-radius-sm); font-size: 15px; }
+.pp-message--error { background: var(--pp-error-soft); color: var(--pp-error); }
+.pp-message--success { background: var(--pp-success-soft); color: var(--pp-success); }

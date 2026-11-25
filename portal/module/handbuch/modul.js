@@ -139,6 +139,8 @@ export default {
   id: "handbuch",
   name: "Logbuch",
   beschreibung: "BPMN-Modell hochladen (auch mehrere Dateien), Titel eingeben und ein Handbuch als PDF erstellen.",
+  icon: "book",
+  knopf: "Handbuch erstellen",
   migrationen: MIGRATIONEN,
   oberflaeche: path.join(path.dirname(fileURLToPath(import.meta.url)), "oberflaeche"),
   router

@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ProzessPilot · Ihre Werkzeuge</title>
+<!-- Referenzseite für die Portal-Startseite (Entwurf C3). Statisch, Inhalte sind Beispiele.
+     Pfade auf die Stilvorlage im Repo angepasst (kern/stil/), sonst wie geliefert. -->
+<link rel="stylesheet" href="../../kern/stil/prozesspilot.css">
+</head>
+<body>
+<div class="pp-page">
+
+  <header class="pp-header">
+    <div class="pp-container pp-header__inner">
+      <a href="/" class="pp-wordmark">Prozess<span>Pilot</span></a>
+      <div class="pp-header__right">
+        <span class="pp-org">Wissen und Werkzeug</span>
+        <a href="/abmelden" class="pp-btn pp-btn--text">Abmelden</a>
+      </div>
+    </div>
+  </header>
+
+  <section class="pp-band">
+    <div class="pp-container pp-band__inner">
+      <span class="pp-eyebrow">Freigeschaltete Werkzeuge</span>
+      <h1>Willkommen im ProzessPilot</h1>
+      <p class="pp-band__lead">Hier finden Sie alle Werkzeuge, die für Ihre Organisation freigeschaltet sind.</p>
+    </div>
+  </section>
+
+  <main class="pp-main">
+    <div class="pp-container">
+      <div class="pp-cards">
+
+        <!-- Werkzeugkarte: eine je freigeschaltetem Modul -->
+        <article class="pp-card">
+          <span class="pp-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+          </span>
+          <div class="pp-card__title-row">
+            <h2>Logbuch</h2>
+            <span class="pp-tag pp-tag--success">Freigeschaltet</span>
+          </div>
+          <p>BPMN-Modell hochladen (auch mehrere Dateien), Titel eingeben und ein Handbuch als PDF erstellen.</p>
+          <div class="pp-card__action">
+            <a href="/logbuch" class="pp-btn pp-btn--primary">Handbuch erstellen</a>
+          </div>
+        </article>
+
+        <!-- Kontaktkarte: immer die letzte Karte -->
+        <div class="pp-card pp-card--contact">
+          <span class="pp-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          </span>
+          <h2>Weitere Werkzeuge</h2>
+          <p>Wunsch nach weiteren Werkzeugen, Fehler oder Verbesserungsvorschläge? Bitte melden Sie sich.</p>
+          <a href="mailto:patrick.rosskothen@wiundwe.de" class="pp-link-arrow">Kontakt aufnehmen →</a>
+        </div>
+
+      </div>
+    </div>
+  </main>
+
+  <footer class="pp-footer">
+    <div class="pp-container pp-footer__inner">
+      <img src="../../kern/stil/logo-wissen-und-werkzeug.png" alt="Wissen und Werkzeug">
+      <span>Testversion</span>
+    </div>
+  </footer>
+
+</div>
+</body>
+</html>

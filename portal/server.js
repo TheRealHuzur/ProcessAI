@@ -8,6 +8,8 @@ import { oeffnePortalDatenbank } from "./db.js";
 import { MODULE, pruefeModule } from "./module/index.js";
 
 const OBERFLAECHE = path.join(ROOT_DIR, "portal", "oberflaeche");
+// Gemeinsame Stilvorlage (Styleguide, Schriften, Logo, Icons), auch ohne Anmeldung für die Anmeldeseite
+const STIL = path.join(ROOT_DIR, "kern", "stil");
 const warte = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export function erstellePortal({ db, config, module = MODULE }) {
@@ -33,7 +35,7 @@ export function erstellePortal({ db, config, module = MODULE }) {
   const istAdmin = (req) => Boolean(config.adminPasswort) && adminSitzung.lesen(req) === "admin";
   const freigeschaltet = (mandant) => module
     .filter((m) => mandant.module.some((x) => x.modul_id === m.id))
-    .map((m) => ({ id: m.id, name: m.name, beschreibung: m.beschreibung, adresse: `/m/${m.id}/` }));
+    .map((m) => ({ id: m.id, name: m.name, beschreibung: m.beschreibung, icon: m.icon || "", knopf: m.knopf || "Öffnen", adresse: `/m/${m.id}/` }));
   const fehler = (res, error, was) => {
     if (error instanceof KontenFehler) return res.status(error.status).json({ fehler: error.message });
     console.error(`${was} fehlgeschlagen:`, error);
@@ -41,6 +43,7 @@ export function erstellePortal({ db, config, module = MODULE }) {
   };
 
   app.get("/api/health", (req, res) => res.json({ ok: true }));
+  app.use("/stil", express.static(STIL, { maxAge: "1h", fallthrough: false }));
 
   // ---------- Mandanten ----------
   const json = express.json({ limit: "100kb" });

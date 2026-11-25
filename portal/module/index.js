@@ -5,7 +5,9 @@
 // Steckbrief eines Moduls:
 //   id            fest, klein, nie ändern (steht in der Freischaltung je Mandant)
 //   name          Anzeige in Startseite und Verwaltung
-//   beschreibung  ein Satz für die Kachel
+//   beschreibung  ein bis zwei Sätze für die Werkzeugkarte der Startseite
+//   icon          Name eines Icons aus kern/stil/icons.js (Lucide-Stil), sonst ohne Icon
+//   knopf         Beschriftung des Buttons auf der Karte, zwei bis drei Wörter (Standard „Öffnen“)
 //   migrationen   eigene Tabellen (SQL-Liste, nur anhängen); jede Tabelle mit mandant_id
 //   oberflaeche   Ordner mit index.html, erreichbar unter /m/<id>/
 //   router(ctx)   Express-Router unter /api/m/<id>; req.mandant ist gesetzt und freigeschaltet.

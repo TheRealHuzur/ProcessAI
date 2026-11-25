@@ -125,6 +125,11 @@ test("Freischalten je Mandant und Modul, Lizenz test oder voll", async () => {
   await amtB("/api/anmelden", { method: "POST", body: { benutzername: "kreis-b", passwort: "passwort-b1" } });
   const s = await amtA("/api/sitzung");
   assert.deepEqual(s.daten.module.map((x) => x.id), ["handbuch"]);
+  // Werkzeugkarte der Startseite: Daten aus dem Steckbrief
+  assert.deepEqual(s.daten.module[0], {
+    id: "handbuch", name: "Logbuch", icon: "book", knopf: "Handbuch erstellen", adresse: "/m/handbuch/",
+    beschreibung: "BPMN-Modell hochladen (auch mehrere Dateien), Titel eingeben und ein Handbuch als PDF erstellen."
+  });
   assert.equal((await amtA("/m/handbuch/")).status, 200);
 });
 
@@ -197,6 +202,8 @@ test("Weiteres Modul ohne Änderung am Kontokern: freischalten, eigene Daten je 
   assert.deepEqual((await amtB("/api/m/notizen")).daten.notizen, []);
   const s = await amtA("/api/sitzung");
   assert.deepEqual(s.daten.module.map((x) => x.id), ["handbuch", "notizen"]);
+  // Steckbrief ohne Icon und Buttontext: Karte ohne Icon, Button „Öffnen“
+  assert.deepEqual([s.daten.module[1].icon, s.daten.module[1].knopf], ["", "Öffnen"]);
   // Sperren wirkt sofort, auch in einer laufenden Sitzung
   await admin(`/api/verwaltung/mandanten/${idA}/module/notizen`, { method: "PUT", body: { an: false } });
   assert.equal((await amtA("/api/m/notizen")).status, 403);
@@ -222,4 +229,28 @@ test("Gesperrter Mandant und neues Passwort", async () => {
 test("Titel aus Dateiname", () => {
   assert.equal(titelAusDateiname("ZPD_Externe_Beratung.bpmn"), "ZPD Externe Beratung");
   assert.equal(titelAusDateiname("Antrag auf Teilzeit bearbeiten.XML"), "Antrag auf Teilzeit bearbeiten");
+});
+
+test("Stilvorlage: ohne Anmeldung erreichbar, Schriften lokal, keine Google-Server", async () => {
+  const gast = client();
+  const css = await gast("/stil/prozesspilot.css");
+  assert.equal(css.status, 200);
+  assert.match(css.headers.get("content-type"), /text\/css/);
+  const text = css.daten.toString("utf8");
+  const schriften = [...text.matchAll(/url\("(schriften\/[^"]+)"\)/g)].map((t) => t[1]);
+  assert.equal(schriften.length, 7, "Montserrat 400 bis 700, Roboto 400, 500, 700");
+  for (const datei of schriften) assert.equal((await gast(`/stil/${datei}`)).status, 200, datei);
+  assert.equal((await gast("/stil/logo-wissen-und-werkzeug.png")).status, 200);
+  assert.equal((await gast("/stil/gibtsnicht.css")).status, 404);
+  const startseite = (await gast("/")).daten.toString("utf8");
+  for (const inhalt of [text, startseite]) assert.ok(!/fonts\.(googleapis|gstatic)\.com/.test(inhalt));
+  assert.ok(startseite.includes('href="/stil/prozesspilot.css"'));
+});
+
+test("Jedes Modul nennt ein vorhandenes Icon und einen Buttontext", () => {
+  const icons = fs.readFileSync(path.join(__dirname, "..", "kern", "stil", "icons.js"), "utf8");
+  for (const m of MODULE) {
+    assert.ok(m.knopf, `${m.id}: knopf fehlt`);
+    assert.ok(new RegExp(`\\b${m.icon}: '`).test(icons), `${m.id}: Icon ${m.icon} fehlt in kern/stil/icons.js`);
+  }
 });
