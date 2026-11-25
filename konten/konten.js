@@ -82,7 +82,18 @@ export function kontokern(db) {
     modulAus: db.prepare("DELETE FROM mandant_module WHERE mandant_id = ? AND modul_id = ?"),
     protokollieren: db.prepare("INSERT INTO protokoll (zeit, mandant_id, modul_id, aktion, ergebnis, details) VALUES (?, ?, ?, ?, ?, ?)"),
     protokollAlle: db.prepare("SELECT * FROM protokoll ORDER BY id DESC LIMIT ?"),
-    protokollMandant: db.prepare("SELECT * FROM protokoll WHERE mandant_id = ? ORDER BY id DESC LIMIT ?")
+    protokollMandant: db.prepare("SELECT * FROM protokoll WHERE mandant_id = ? ORDER BY id DESC LIMIT ?"),
+    // Nutzung je Mandant aus dem Protokoll; Aktionen der Verwaltung zählen nicht
+    nutzung: db.prepare(`SELECT m.id, m.name, m.benutzername, m.aktiv,
+        SUM(p.aktion = 'anmelden' AND p.ergebnis = 'ok') AS anmeldungen,
+        SUM(p.aktion = 'anmelden' AND p.ergebnis = 'fehler') AS fehlversuche,
+        SUM(p.aktion = 'besuch') AS besuche,
+        MAX(CASE WHEN p.aktion = 'anmelden' AND p.ergebnis = 'ok' THEN p.zeit END) AS letzte_anmeldung,
+        MAX(CASE WHEN p.aktion NOT LIKE 'verwaltung:%' AND p.ergebnis = 'ok' THEN p.zeit END) AS zuletzt_aktiv
+      FROM mandanten m LEFT JOIN protokoll p ON p.mandant_id = m.id
+      GROUP BY m.id ORDER BY zuletzt_aktiv IS NULL, zuletzt_aktiv DESC, m.name COLLATE NOCASE`),
+    aktionenJeMandant: db.prepare(`SELECT mandant_id, modul_id, aktion, ergebnis, COUNT(*) AS anzahl, MAX(zeit) AS zuletzt
+      FROM protokoll WHERE mandant_id IS NOT NULL AND modul_id <> '' GROUP BY mandant_id, modul_id, aktion, ergebnis`)
   };
 
   const mitModulen = (m) => m && ({ ...m, aktiv: Boolean(m.aktiv), module: q.module.all(m.id) });
@@ -153,6 +164,12 @@ export function kontokern(db) {
       return holen(m.id);
     },
 
+    // ID des Mandanten zu einem Benutzernamen (auch gesperrt), sonst null; nur fürs Protokoll
+    kennung(bn) {
+      const m = q.nachName.get(String(bn ?? "").trim());
+      return m ? m.id : null;
+    },
+
     // Aktiver Mandant zur ID aus der Sitzung, sonst null
     aktiverMandant(id) {
       const m = mitModulen(q.eins.get(String(id)));
@@ -165,6 +182,19 @@ export function kontokern(db) {
 
     protokoll({ mandantId = null, anzahl = 200 } = {}) {
       return mandantId ? q.protokollMandant.all(mandantId, anzahl) : q.protokollAlle.all(anzahl);
+    },
+
+    // Je Mandant: Anmeldungen, Fehlversuche, Besuche, letzte Anmeldung, zuletzt aktiv, dazu Aktionen je Modul
+    nutzung() {
+      const aktionen = q.aktionenJeMandant.all();
+      return q.nutzung.all().map((m) => ({
+        ...m,
+        aktiv: Boolean(m.aktiv),
+        anmeldungen: m.anmeldungen || 0,
+        fehlversuche: m.fehlversuche || 0,
+        besuche: m.besuche || 0,
+        module: aktionen.filter((a) => a.mandant_id === m.id).map(({ mandant_id, ...a }) => a)
+      }));
     }
   };
 }

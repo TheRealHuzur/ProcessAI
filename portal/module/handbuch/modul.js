@@ -1,13 +1,14 @@
 // Modul Logbuch (ID handbuch): BPMN-Datei(en) und Titel rein, Handbuch als PDF raus. Mehrere Dateien
 // werden zu einem Handbuch zusammengeführt (PICTURE exportiert teils je Diagramm eine Datei). Mehr sieht der
-// Kunde nicht. Im Hintergrund bleibt jede hochgeladene Datei auf dem Server (Übungsmaterial zur
-// Verbesserung, mit den Kunden abgesprochen); angezeigt oder wiederverwendet wird davon nichts.
+// Kunde nicht. Im Hintergrund bleiben jede hochgeladene Datei und jedes erzeugte PDF auf dem Server, dazu
+// Kennzahlen je Handbuch (Übungsmaterial zur Verbesserung, mit den Kunden abgesprochen). Dem Kunden wird
+// davon nichts angezeigt; auswerten kann nur die Verwaltung (Router verwaltung).
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import express from "express";
-import { erzeugeHandbuch, HandbuchFehler } from "../../../kern/handbuch/index.js";
+import { leseHandbuch, pdfAusGliederung, HandbuchFehler } from "../../../kern/handbuch/index.js";
 
 const MAX_GROESSE = "30mb";
 const MAX_DATEIEN = 20;
@@ -32,7 +33,32 @@ const MIGRATIONEN = [
    CREATE INDEX idx_hb_uploads_mandant ON hb_uploads(mandant_id, hochgeladen);`,
   // Mehrere Dateien je Handbuch: gemeinsame Vorgangs-ID
   `ALTER TABLE hb_uploads ADD COLUMN vorgang TEXT NOT NULL DEFAULT '';
-   UPDATE hb_uploads SET vorgang = id WHERE vorgang = '';`
+   UPDATE hb_uploads SET vorgang = id WHERE vorgang = '';`,
+  // Ein Eintrag je Handbuch (Vorgang) mit abgelegtem PDF und Kennzahlen; Altbestand ohne PDF und Kennzahlen
+  `CREATE TABLE hb_handbuecher (
+     vorgang TEXT PRIMARY KEY,
+     mandant_id TEXT NOT NULL REFERENCES mandanten(id),
+     titel TEXT NOT NULL DEFAULT '',
+     dateien INTEGER NOT NULL DEFAULT 0,
+     upload_groesse INTEGER NOT NULL DEFAULT 0,
+     werkzeug TEXT NOT NULL DEFAULT '',
+     status TEXT NOT NULL CHECK (status IN ('ok', 'fehler')),
+     meldung TEXT NOT NULL DEFAULT '',
+     pdf TEXT NOT NULL DEFAULT '',
+     pdf_groesse INTEGER NOT NULL DEFAULT 0,
+     seiten INTEGER,
+     kapitel INTEGER,
+     schritte INTEGER,
+     mit_arbeitshilfe INTEGER,
+     mit_angaben INTEGER,
+     fehlende_unterdiagramme INTEGER,
+     dauer_ms INTEGER,
+     erstellt TEXT NOT NULL
+   );
+   CREATE INDEX idx_hb_handbuecher_mandant ON hb_handbuecher(mandant_id, erstellt);
+   INSERT INTO hb_handbuecher (vorgang, mandant_id, titel, dateien, upload_groesse, status, meldung, erstellt)
+     SELECT vorgang, mandant_id, MAX(titel), COUNT(*), SUM(groesse), MAX(status), MAX(meldung), MIN(hochgeladen)
+     FROM hb_uploads GROUP BY vorgang, mandant_id;`
 ];
 
 class EingabeFehler extends Error {}
@@ -55,6 +81,37 @@ export function titelAusDateiname(dateiname) {
   return dateiname.replace(/\.(bpmn|xml)$/i, "").replace(/_+/g, " ").replace(/\s+/g, " ").trim();
 }
 
+// Herkunft der Datei laut BPMN-Kopf (exporter), z. B. PICTURE, ADONIS, Camunda Modeler
+export function werkzeugAus(xml) {
+  const kopf = String(xml || "").slice(0, 4000);
+  const name = (kopf.match(/\bexporter\s*=\s*"([^"]*)"/) || [])[1] || "";
+  const version = (kopf.match(/\bexporterVersion\s*=\s*"([^"]*)"/) || [])[1] || "";
+  return bereinigt(`${name} ${version}`).slice(0, 80);
+}
+
+// Kennzahlen aus der Gliederung: wie vollständig ist das Wissen am Modell
+export function kennzahlen(gliederung) {
+  const z = { kapitel: gliederung.kapitel.length, schritte: 0, mit_arbeitshilfe: 0, mit_angaben: 0, fehlende_unterdiagramme: 0 };
+  const zaehle = (eintraege) => {
+    for (const e of eintraege) {
+      if (e.art !== "bahn") {
+        z.schritte += 1;
+        if (e.arbeitshilfe) z.mit_arbeitshilfe += 1;
+        if (Object.values(e.wissen || {}).some((w) => Array.isArray(w) && w.length)) z.mit_angaben += 1;
+        if (e.hinweis) z.fehlende_unterdiagramme += 1;
+      }
+      zaehle(e.eintraege || []);
+    }
+  };
+  for (const k of gliederung.kapitel) zaehle(k.eintraege);
+  return z;
+}
+
+// Seitenzahl aus dem PDF (pdfmake schreibt die Seitenobjekte unkomprimiert)
+export function seitenImPdf(pdf) {
+  return (Buffer.from(pdf).toString("latin1").match(/\/Type\s*\/Page(?![s\w])/g) || []).length;
+}
+
 function datumHeute() {
   return new Intl.DateTimeFormat("de-DE", { timeZone: "Europe/Berlin", day: "2-digit", month: "2-digit", year: "numeric" }).format(new Date());
 }
@@ -62,6 +119,9 @@ function datumHeute() {
 function router({ db, kern, datenDir }) {
   const ablegen = db.prepare(`INSERT INTO hb_uploads (id, vorgang, mandant_id, dateiname, titel, datei, groesse, status, meldung, hochgeladen)
                               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+  const vermerken = db.prepare(`INSERT INTO hb_handbuecher (vorgang, mandant_id, titel, dateien, upload_groesse, werkzeug, status, meldung,
+                                  pdf, pdf_groesse, seiten, kapitel, schritte, mit_arbeitshilfe, mit_angaben, fehlende_unterdiagramme, dauer_ms, erstellt)
+                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
   const r = express.Router();
 
   // Erwartet JSON { titel, dateien: [{ name, inhalt }] }; inhalt ist der Text der BPMN-Datei
@@ -100,8 +160,12 @@ function router({ db, kern, datenDir }) {
 
     let pdf = null;
     let meldung = "";
+    let zahlen = {};
+    const start = Date.now();
     try {
-      pdf = await erzeugeHandbuch(dateien.map((d) => ({ name: d.name, xml: d.inhalt })), {
+      const gliederung = await leseHandbuch(dateien.map((d) => ({ name: d.name, xml: d.inhalt })));
+      zahlen = kennzahlen(gliederung);
+      pdf = await pdfAusGliederung(gliederung, {
         name: titel,
         stand: datumHeute(),
         organisation: req.mandant.name,
@@ -113,8 +177,29 @@ function router({ db, kern, datenDir }) {
       if (!(error instanceof HandbuchFehler)) console.error("Handbuch fehlgeschlagen:", error);
     }
 
+    const dauer = Date.now() - start;
     const status = pdf ? "ok" : "fehler";
     const zeit = new Date().toISOString();
+    // Auch das PDF bleibt im Hintergrund, unter der Vorgangs-ID
+    let pdfRelativ = "";
+    if (pdf) {
+      try {
+        fs.mkdirSync(path.join(datenDir, "handbuecher", req.mandant.id), { recursive: true });
+        pdfRelativ = path.join("handbuecher", req.mandant.id, `${vorgang}.pdf`);
+        fs.writeFileSync(path.join(datenDir, pdfRelativ), Buffer.from(pdf));
+      } catch (error) {
+        pdfRelativ = "";
+        console.error("Handbuch nicht abgelegt:", error);
+      }
+    }
+    const werkzeug = [...new Set(dateien.map((d) => werkzeugAus(d.inhalt)).filter(Boolean))].join(", ").slice(0, 200);
+    try {
+      vermerken.run(vorgang, req.mandant.id, titel, dateien.length, dateien.reduce((s, d) => s + Buffer.byteLength(d.inhalt), 0), werkzeug, status, meldung,
+        pdfRelativ, pdf ? pdf.length : 0, pdf ? seitenImPdf(pdf) : null, zahlen.kapitel ?? null, zahlen.schritte ?? null, zahlen.mit_arbeitshilfe ?? null,
+        zahlen.mit_angaben ?? null, zahlen.fehlende_unterdiagramme ?? null, dauer, zeit);
+    } catch (error) {
+      console.error("Handbuch nicht vermerkt:", error);
+    }
     for (const d of abgelegt) {
       try {
         ablegen.run(d.id, vorgang, req.mandant.id, d.name, titel, d.relativ, Buffer.byteLength(d.inhalt), status, meldung, zeit);
@@ -135,6 +220,40 @@ function router({ db, kern, datenDir }) {
   return r;
 }
 
+// Nur für die Verwaltung (unter /api/verwaltung/m/handbuch): Liste der Handbücher, Download von PDF und Dateien.
+// Pfade kommen immer aus der Datenbank, nie aus der Anfrage.
+function verwaltung({ db, datenDir }) {
+  const q = {
+    liste: db.prepare(`SELECT h.*, m.name AS organisation,
+                         (SELECT json_group_array(json_object('id', u.id, 'name', u.dateiname)) FROM hb_uploads u WHERE u.vorgang = h.vorgang) AS dateiliste
+                       FROM hb_handbuecher h LEFT JOIN mandanten m ON m.id = h.mandant_id
+                       ORDER BY h.erstellt DESC LIMIT ?`),
+    pdf: db.prepare("SELECT pdf, titel FROM hb_handbuecher WHERE vorgang = ?"),
+    datei: db.prepare("SELECT datei, dateiname FROM hb_uploads WHERE id = ?")
+  };
+  const senden = (res, relativ, name, typ) => {
+    const voll = relativ && path.resolve(datenDir, relativ);
+    if (!voll || !voll.startsWith(path.resolve(datenDir) + path.sep) || !fs.existsSync(voll)) return res.status(404).json({ fehler: "Datei nicht vorhanden." });
+    res.setHeader("Content-Type", typ);
+    res.setHeader("Content-Disposition", `attachment; filename="datei"; filename*=UTF-8''${encodeURIComponent(name)}`);
+    return res.sendFile(voll);
+  };
+  const r = express.Router();
+  r.get("/handbuecher", (req, res) => {
+    const anzahl = Math.min(Math.max(Number(req.query.anzahl) || 100, 1), 1000);
+    res.json({ handbuecher: q.liste.all(anzahl).map(({ dateiliste, ...h }) => ({ ...h, dateien_liste: JSON.parse(dateiliste || "[]") })) });
+  });
+  r.get("/handbuecher/:vorgang/pdf", (req, res) => {
+    const h = q.pdf.get(String(req.params.vorgang));
+    return senden(res, h && h.pdf, `${(h && h.titel) || "Handbuch"}.pdf`, "application/pdf");
+  });
+  r.get("/dateien/:id", (req, res) => {
+    const d = q.datei.get(String(req.params.id));
+    return senden(res, d && d.datei, (d && d.dateiname) || "datei.bpmn", "application/xml");
+  });
+  return r;
+}
+
 export default {
   id: "handbuch",
   name: "Logbuch",
@@ -143,5 +262,6 @@ export default {
   knopf: "Handbuch erstellen",
   migrationen: MIGRATIONEN,
   oberflaeche: path.join(path.dirname(fileURLToPath(import.meta.url)), "oberflaeche"),
-  router
+  router,
+  verwaltung
 };

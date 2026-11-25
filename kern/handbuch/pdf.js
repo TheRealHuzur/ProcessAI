@@ -182,7 +182,11 @@ export function handbuchDokument(handbuch, {
   };
 }
 
-export async function erzeugeHandbuch(xml, optionen = {}) {
-  const handbuch = await leseHandbuch(xml);
+// PDF aus einer schon gelesenen Gliederung (leseHandbuch), z. B. wenn der Aufrufer die Gliederung auch auswertet
+export async function pdfAusGliederung(handbuch, optionen = {}) {
   return pdfmake.createPdf(handbuchDokument(handbuch, optionen)).getBuffer();
+}
+
+export async function erzeugeHandbuch(xml, optionen = {}) {
+  return pdfAusGliederung(await leseHandbuch(xml), optionen);
 }

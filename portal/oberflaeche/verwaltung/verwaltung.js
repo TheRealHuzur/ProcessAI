@@ -10,11 +10,15 @@
   const meldung = (text, art) => zeigeMeldung(document.getElementById("meldung"), text, art);
 
   async function laden() {
-    const [m, l, p] = await Promise.all([api(`${V}/module`), api(`${V}/mandanten`), api(`${V}/protokoll`)]);
+    const [m, l, p, n, h] = await Promise.all([
+      api(`${V}/module`), api(`${V}/mandanten`), api(`${V}/protokoll`), api(`${V}/nutzung`), api(`${V}/m/handbuch/handbuecher`)
+    ]);
     module = m.module;
     lizenzen = m.lizenzen;
     mandantNamen = new Map(l.mandanten.map((x) => [x.id, x.name]));
     zeigeMandanten(l.mandanten);
+    zeigeNutzung(n.mandanten);
+    zeigeHandbuecher(h.handbuecher);
     zeigeProtokoll(p.eintraege);
   }
 
@@ -65,6 +69,64 @@
         el("td", {}, ...modulZelle(m)),
         el("td", {}, el("div", { class: "passwort-neu" }, pw, pwKnopf)),
         el("td", {}, el("div", { class: "zugang" }, el("span", { class: `pp-tag pp-tag--${m.aktiv ? "success" : "error"}`, text: m.aktiv ? "aktiv" : "gesperrt" }), sperre))
+      ));
+    }
+  }
+
+  const leereZeile = (body, spalten, text) => body.append(el("tr", {}, el("td", { colspan: spalten, class: "pp-small", text })));
+  const zeitOder = (iso) => (iso ? datum(iso) : "–");
+
+  function zeigeNutzung(liste) {
+    const body = document.getElementById("nutzung");
+    body.replaceChildren();
+    if (!liste.length) return leereZeile(body, 7, "Noch keine Mandanten angelegt.");
+    for (const m of liste) {
+      const hb = m.module.filter((a) => a.modul_id === "handbuch" && a.aktion === "handbuch erstellt");
+      const ok = hb.filter((a) => a.ergebnis === "ok").reduce((s, a) => s + a.anzahl, 0);
+      const fehler = hb.filter((a) => a.ergebnis !== "ok").reduce((s, a) => s + a.anzahl, 0);
+      body.append(el("tr", { class: m.aktiv ? "" : "gesperrt" },
+        el("td", {}, el("strong", { text: m.name }), el("div", { class: "pp-small", text: m.benutzername })),
+        el("td", { text: String(m.anmeldungen) }),
+        el("td", { text: String(m.fehlversuche) }),
+        el("td", { text: String(m.besuche) }),
+        el("td", {}, `${ok} `, fehler ? el("span", { class: "pp-tag pp-tag--error", text: `${fehler} Fehler` }) : null),
+        el("td", { class: "pp-small", text: zeitOder(m.letzte_anmeldung) }),
+        el("td", { class: "pp-small", text: zeitOder(m.zuletzt_aktiv) })
+      ));
+    }
+  }
+
+  function zeigeHandbuecher(liste) {
+    const body = document.getElementById("handbuecher");
+    body.replaceChildren();
+    if (!liste.length) return leereZeile(body, 7, "Noch keine Handbücher erstellt.");
+    const B = `${V}/m/handbuch`;
+    // Kennzahlen des Inhalts; bei Fehlern steht stattdessen die Meldung, die der Kunde gesehen hat
+    const inhalt = (h) => {
+      if (h.status !== "ok") return [el("div", { text: h.meldung || "ohne Meldung" })];
+      if (h.seiten === null) return [el("div", { text: "keine Kennzahlen (vor 25.11.2026)" })];
+      const zeilen = [
+        `${h.seiten} Seiten · ${h.schritte} Schritte`,
+        `${h.mit_arbeitshilfe} mit Arbeitshilfe · ${h.mit_angaben} mit Angaben`,
+        h.fehlende_unterdiagramme ? `${h.fehlende_unterdiagramme} Unterdiagramm${h.fehlende_unterdiagramme === 1 ? "" : "e"} fehlen` : "",
+        `${(h.dauer_ms / 1000).toLocaleString("de-DE", { maximumFractionDigits: 1 })} s`
+      ];
+      return zeilen.filter(Boolean).map((t) => el("div", { class: "kennzahl", text: t }));
+    };
+    for (const h of liste) {
+      const ok = h.status === "ok";
+      const links = [
+        h.pdf ? el("div", {}, el("a", { href: `${B}/handbuecher/${encodeURIComponent(h.vorgang)}/pdf`, text: "PDF" })) : null,
+        ...h.dateien_liste.map((d) => el("div", {}, el("a", { href: `${B}/dateien/${encodeURIComponent(d.id)}`, text: d.name })))
+      ];
+      body.append(el("tr", {},
+        el("td", { class: "pp-small", text: datum(h.erstellt) }),
+        el("td", { text: h.organisation || "?" }),
+        el("td", { text: h.titel }),
+        el("td", {}, el("span", { class: `pp-tag pp-tag--${ok ? "success" : "error"}`, text: ok ? "ok" : "Fehler" })),
+        el("td", { class: "pp-small" }, ...inhalt(h)),
+        el("td", { class: "pp-small", text: h.werkzeug || "–" }),
+        el("td", { class: "pp-small dateien" }, ...links)
       ));
     }
   }

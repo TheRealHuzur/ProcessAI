@@ -11,6 +11,8 @@ const OBERFLAECHE = path.join(ROOT_DIR, "portal", "oberflaeche");
 // Gemeinsame Stilvorlage (Styleguide, Schriften, Logo, Icons), auch ohne Anmeldung für die Anmeldeseite
 const STIL = path.join(ROOT_DIR, "kern", "stil");
 const warte = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+// Ein Besuch je Mandant höchstens alle 30 Minuten im Protokoll (die Sitzung hält 30 Tage, Anmelden allein zeigt die Nutzung nicht)
+const BESUCH_PAUSE_MS = 30 * 60 * 1000;
 
 export function erstellePortal({ db, config, module = MODULE }) {
   pruefeModule(module);
@@ -28,9 +30,19 @@ export function erstellePortal({ db, config, module = MODULE }) {
     next();
   });
 
+  // Im Hintergrund: Besuche je Mandant mitschreiben (nur im Speicher gedrosselt, nach Neustart zählt der nächste Aufruf neu)
+  const letzterBesuch = new Map();
+  const merkeBesuch = (mandant, aktion) => {
+    const jetzt = Date.now();
+    if (aktion === "besuch" && jetzt - (letzterBesuch.get(mandant.id) || 0) < BESUCH_PAUSE_MS) return;
+    letzterBesuch.set(mandant.id, jetzt);
+    if (aktion === "besuch") kern.protokolliere({ mandantId: mandant.id, aktion: "besuch" });
+  };
   const angemeldet = (req) => {
     const id = mandantSitzung.lesen(req);
-    return id ? kern.aktiverMandant(id) : null;
+    const mandant = id ? kern.aktiverMandant(id) : null;
+    if (mandant) merkeBesuch(mandant, "besuch");
+    return mandant;
   };
   const istAdmin = (req) => Boolean(config.adminPasswort) && adminSitzung.lesen(req) === "admin";
   const freigeschaltet = (mandant) => module
@@ -57,16 +69,19 @@ export function erstellePortal({ db, config, module = MODULE }) {
     const { benutzername, passwort } = req.body || {};
     const mandant = kern.pruefeZugang(benutzername, passwort);
     if (!mandant) {
-      kern.protokolliere({ aktion: "anmelden", ergebnis: "fehler", details: String(benutzername || "").slice(0, 120) });
+      kern.protokolliere({ mandantId: kern.kennung(benutzername), aktion: "anmelden", ergebnis: "fehler", details: String(benutzername || "").slice(0, 120) });
       await warte(1000);
       return res.status(401).json({ fehler: "Benutzername oder Passwort stimmt nicht." });
     }
     mandantSitzung.setzen(req, res, mandant.id);
     kern.protokolliere({ mandantId: mandant.id, aktion: "anmelden" });
+    merkeBesuch(mandant, "anmelden");
     return res.json({ ok: true, mandant: { name: mandant.name }, module: freigeschaltet(mandant) });
   });
 
   app.post("/api/abmelden", (req, res) => {
+    const id = mandantSitzung.lesen(req);
+    if (id) kern.protokolliere({ mandantId: id, aktion: "abmelden" });
     mandantSitzung.loeschen(req, res);
     res.json({ ok: true });
   });
@@ -149,6 +164,13 @@ export function erstellePortal({ db, config, module = MODULE }) {
       return fehler(res, error, "Modul setzen");
     }
   });
+  verwaltung.get("/nutzung", (req, res) => res.json({ mandanten: kern.nutzung() }));
+  // Auswertung je Modul (optionaler Steckbrief-Eintrag verwaltung), Daten wie beim Modul selbst
+  for (const modul of module) {
+    if (typeof modul.verwaltung === "function") {
+      verwaltung.use(`/m/${modul.id}`, modul.verwaltung({ db, kern, datenDir: path.join(config.dataDir, "module", modul.id) }));
+    }
+  }
   verwaltung.get("/protokoll", (req, res) => {
     res.json({ eintraege: kern.protokoll({ mandantId: req.query.mandant ? String(req.query.mandant) : null, anzahl: 200 }) });
   });

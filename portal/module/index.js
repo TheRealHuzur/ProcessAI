@@ -12,6 +12,8 @@
 //   oberflaeche   Ordner mit index.html, erreichbar unter /m/<id>/
 //   router(ctx)   Express-Router unter /api/m/<id>; req.mandant ist gesetzt und freigeschaltet.
 //                 ctx: { db, kern, datenDir } mit eigenem Datenordner je Modul
+//   verwaltung(ctx) optional: Express-Router unter /api/verwaltung/m/<id>, nur für die Verwaltung
+//                 (Auswertung, Downloads); gleicher ctx wie router
 import handbuch from "./handbuch/modul.js";
 
 export const MODULE = [handbuch];

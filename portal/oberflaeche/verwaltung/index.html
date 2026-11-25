@@ -20,6 +20,8 @@
     .passwort-neu .pp-field { min-width: 150px; padding: 6px 10px; }
     .zugang { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
     .gesperrt td { opacity: 0.55; }
+    .dateien a { overflow-wrap: anywhere; }
+    .kennzahl { white-space: nowrap; }
     .karten-titel { font-size: 18px; margin-bottom: 14px; }
     @media (max-width: 767px) { .formzeile { grid-template-columns: 1fr; } .formzeile .pp-btn { justify-self: center; } }
   </style>
@@ -74,6 +76,22 @@
           <table class="pp-table">
             <thead><tr><th>Organisation</th><th>Benutzername</th><th>Module</th><th>Passwort neu setzen</th><th>Zugang</th></tr></thead>
             <tbody id="mandanten"></tbody>
+          </table>
+        </div>
+
+        <h2 class="pp-section-title">Nutzung</h2>
+        <div class="pp-card pp-card--plain pp-table-wrap">
+          <table class="pp-table">
+            <thead><tr><th>Organisation</th><th>Anmeldungen</th><th>Fehlversuche</th><th>Besuche</th><th>Handbücher</th><th>Letzte Anmeldung</th><th>Zuletzt aktiv</th></tr></thead>
+            <tbody id="nutzung"></tbody>
+          </table>
+        </div>
+
+        <h2 class="pp-section-title">Handbücher</h2>
+        <div class="pp-card pp-card--plain pp-table-wrap">
+          <table class="pp-table">
+            <thead><tr><th>Zeit</th><th>Organisation</th><th>Titel</th><th>Ergebnis</th><th>Inhalt</th><th>Herkunft</th><th>Dateien</th></tr></thead>
+            <tbody id="handbuecher"></tbody>
           </table>
         </div>
 

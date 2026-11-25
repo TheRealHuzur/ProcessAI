@@ -10,7 +10,7 @@ import express from "express";
 import { erstellePortal } from "../portal/server.js";
 import { oeffnePortalDatenbank } from "../portal/db.js";
 import { MODULE } from "../portal/module/index.js";
-import { titelAusDateiname } from "../portal/module/handbuch/modul.js";
+import { titelAusDateiname, werkzeugAus } from "../portal/module/handbuch/modul.js";
 import { hashePasswort, passwortPasst } from "../konten/index.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -193,6 +193,78 @@ test("Logbuch: mehrere Dateien zu einem Handbuch, jede Datei abgelegt, gemeinsam
   assert.equal((await amtA("/api/m/handbuch/erstellen", { method: "POST", body: { titel: "X", dateien: zuViele } })).status, 400);
 });
 
+test("Logbuch im Hintergrund: PDF abgelegt, Kennzahlen je Handbuch, Auswertung nur für die Verwaltung", async () => {
+  const db = oeffnePortalDatenbank(tmp, [...MODULE, notizen]);
+  const zeilen = db.prepare("SELECT * FROM hb_handbuecher ORDER BY erstellt").all();
+  db.close();
+  // A: zwei Einzeldateien ok, eine kaputt, mehrere Dateien ok, mehrere mit kaputter; B: eine ok. 400er werden nicht vermerkt.
+  assert.deepEqual(zeilen.map((z) => [z.mandant_id === idA ? "A" : "B", z.status, z.dateien]), [
+    ["A", "ok", 1], ["A", "ok", 1], ["A", "fehler", 1], ["B", "ok", 1], ["A", "ok", 2], ["A", "fehler", 2]
+  ]);
+  for (const z of zeilen.filter((x) => x.status === "ok")) {
+    assert.ok(z.seiten > 0 && z.schritte > 0 && z.kapitel > 0, "Kennzahlen gesetzt");
+    assert.ok(z.dauer_ms >= 0 && z.pdf_groesse > 0 && z.upload_groesse > 0);
+    assert.equal(fs.readFileSync(path.join(tmp, "module", "handbuch", z.pdf)).subarray(0, 5).toString(), "%PDF-");
+  }
+  const fehler = zeilen.find((z) => z.status === "fehler");
+  assert.deepEqual([fehler.pdf, fehler.seiten], ["", null]);
+  assert.match(fehler.meldung, /kein gültiges BPMN/);
+  assert.equal(zeilen[4].werkzeug, "PICTURE 3.0.0");
+  assert.ok(zeilen[0].mit_arbeitshilfe <= zeilen[0].schritte);
+
+  // Kunde sieht nichts davon
+  assert.equal((await amtA("/api/verwaltung/m/handbuch/handbuecher")).status, 401);
+  assert.equal((await amtA("/api/verwaltung/nutzung")).status, 401);
+
+  // Verwaltung: Liste mit Downloads
+  const liste = (await admin("/api/verwaltung/m/handbuch/handbuecher")).daten.handbuecher;
+  assert.equal(liste.length, 6);
+  assert.equal(liste[1].titel, "Seminar");
+  assert.equal(liste[1].organisation, "Stadt A");
+  assert.deepEqual(liste[1].dateien_liste.map((d) => d.name).sort(), ["PICTURE_Hauptdiagramm.bpmn", "PICTURE_Unterdiagramm.bpmn"]);
+  const pdf = await admin(`/api/verwaltung/m/handbuch/handbuecher/${liste[1].vorgang}/pdf`);
+  assert.equal(pdf.status, 200);
+  assert.equal(pdf.daten.subarray(0, 5).toString(), "%PDF-");
+  const datei = await admin(`/api/verwaltung/m/handbuch/dateien/${liste[1].dateien_liste[0].id}`);
+  assert.equal(datei.status, 200);
+  assert.match(datei.daten.toString(), /exporter="PICTURE"/);
+  assert.equal((await admin(`/api/verwaltung/m/handbuch/handbuecher/${liste[0].vorgang}/pdf`)).status, 404, "Fehler ohne PDF");
+  assert.equal((await admin("/api/verwaltung/m/handbuch/dateien/..%2F..%2Fportal.db")).status, 404);
+
+  // Nutzung je Mandant: Anmeldungen, Fehlversuche (dem Mandanten zugeordnet), Handbücher je Ergebnis
+  const nutzung = (await admin("/api/verwaltung/nutzung")).daten.mandanten;
+  const a = nutzung.find((m) => m.id === idA);
+  assert.deepEqual([a.anmeldungen, a.fehlversuche], [1, 1]);
+  const hb = (e) => a.module.find((x) => x.aktion === "handbuch erstellt" && x.ergebnis === e).anzahl;
+  assert.deepEqual([hb("ok"), hb("fehler")], [3, 2]);
+  assert.ok(a.letzte_anmeldung && a.zuletzt_aktiv >= a.letzte_anmeldung);
+});
+
+test("Besuch mit bestehender Sitzung wird mitgeschrieben, höchstens einmal je 30 Minuten", async () => {
+  // Frische Anmeldung zählt nicht zusätzlich als Besuch
+  const zaehle = () => {
+    const db = oeffnePortalDatenbank(tmp, [...MODULE, notizen]);
+    const n = db.prepare("SELECT COUNT(*) AS n FROM protokoll WHERE mandant_id = ? AND aktion = 'besuch'").get(idA).n;
+    db.close();
+    return n;
+  };
+  const vorher = zaehle();
+  await amtA("/api/sitzung");
+  assert.equal(zaehle(), vorher);
+  // Wiederkehrender Besuch: zweiter Server (wie nach einem Neustart) mit derselben Sitzung
+  const res = await fetch(`${basis}/api/anmelden`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ benutzername: "stadt-a", passwort: "passwort-a1" }) });
+  const cookie = res.headers.getSetCookie()[0].split(";")[0];
+  const db = oeffnePortalDatenbank(tmp, [...MODULE, notizen]);
+  const zweiter = erstellePortal({ db, config: { dataDir: tmp, sessionSecret: "test-geheim", adminPasswort: "admin-geheim", sitzungTage: 1 }, module: [...MODULE, notizen] });
+  const srv = await new Promise((resolve) => { const s2 = zweiter.listen(0, () => resolve(s2)); });
+  const sitzung = () => fetch(`http://127.0.0.1:${srv.address().port}/api/sitzung`, { headers: { Cookie: cookie } }).then((r) => r.json());
+  assert.equal((await sitzung()).angemeldet, true);
+  await sitzung();
+  srv.close();
+  db.close();
+  assert.equal(zaehle(), vorher + 1);
+});
+
 test("Weiteres Modul ohne Änderung am Kontokern: freischalten, eigene Daten je Mandant", async () => {
   assert.equal((await amtA("/api/m/notizen")).status, 403);
   await admin(`/api/verwaltung/mandanten/${idA}/module/notizen`, { method: "PUT", body: { an: true } });
@@ -212,7 +284,7 @@ test("Weiteres Modul ohne Änderung am Kontokern: freischalten, eigene Daten je 
 test("Migrationen je Bereich: erneutes Öffnen ändert nichts, neues Modul kommt dazu", () => {
   const db = oeffnePortalDatenbank(tmp, [...MODULE, notizen]);
   const stand = db.prepare("SELECT bereich, version FROM schema_stand ORDER BY bereich").all().map((z) => [z.bereich, z.version]);
-  assert.deepEqual(stand, [["konten", 1], ["modul:handbuch", 2], ["modul:notizen", 1]]);
+  assert.deepEqual(stand, [["konten", 1], ["modul:handbuch", 3], ["modul:notizen", 1]]);
   db.close();
 });
 
@@ -224,6 +296,32 @@ test("Gesperrter Mandant und neues Passwort", async () => {
   assert.equal((await amtB("/api/anmelden", { method: "POST", body: { benutzername: "kreis-b", passwort: "neues-pw-b2" } })).status, 200);
   const p = await admin("/api/verwaltung/protokoll");
   assert.ok(p.daten.eintraege.some((e) => e.aktion === "handbuch erstellt" && e.ergebnis === "fehler"));
+});
+
+test("Migration 3 des Logbuchs trägt vorhandene Handbücher nach", () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "portal-mig-"));
+  const handbuch = MODULE.find((m) => m.id === "handbuch");
+  let db = oeffnePortalDatenbank(dir, [{ ...handbuch, migrationen: handbuch.migrationen.slice(0, 2) }]);
+  db.prepare("INSERT INTO mandanten (id, name, benutzername, passwort_hash, angelegt, geaendert) VALUES ('m1', 'Amt', 'amt', 'x', 'z', 'z')").run();
+  const upload = db.prepare(`INSERT INTO hb_uploads (id, vorgang, mandant_id, dateiname, titel, datei, groesse, status, meldung, hochgeladen)
+                             VALUES (?, ?, 'm1', ?, 'T', 'd', ?, ?, '', ?)`);
+  upload.run("u1", "v1", "a.bpmn", 10, "ok", "2026-11-24T10:00:00Z");
+  upload.run("u2", "v1", "b.bpmn", 5, "ok", "2026-11-24T10:00:00Z");
+  upload.run("u3", "v2", "c.bpmn", 7, "fehler", "2026-11-25T10:00:00Z");
+  db.close();
+  db = oeffnePortalDatenbank(dir, MODULE);
+  const zeilen = db.prepare("SELECT vorgang, dateien, upload_groesse, status, pdf, seiten FROM hb_handbuecher ORDER BY vorgang").all().map((z) => ({ ...z }));
+  db.close();
+  fs.rmSync(dir, { recursive: true, force: true });
+  assert.deepEqual(zeilen, [
+    { vorgang: "v1", dateien: 2, upload_groesse: 15, status: "ok", pdf: "", seiten: null },
+    { vorgang: "v2", dateien: 1, upload_groesse: 7, status: "fehler", pdf: "", seiten: null }
+  ]);
+});
+
+test("Herkunft aus dem BPMN-Kopf", () => {
+  assert.equal(werkzeugAus('<definitions exporter="PICTURE" exporterVersion="3.0.0">'), "PICTURE 3.0.0");
+  assert.equal(werkzeugAus("<definitions>"), "");
 });
 
 test("Titel aus Dateiname", () => {
