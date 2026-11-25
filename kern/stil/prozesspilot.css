@@ -179,6 +179,10 @@ a:hover { color: var(--pp-teal-hover); }
 .pp-dropzone--selected { border-style: solid; border-color: var(--pp-teal); }
 .pp-dropzone:focus-within { outline: 2px solid var(--pp-teal); outline-offset: 2px; }
 
+/* Navigation zwischen Arbeitsseiten (Verwaltung: Mandanten, Auswertung): die aktive Seite ist unterstrichen */
+.pp-nav { display: flex; align-items: center; gap: 24px; }
+.pp-nav a[aria-current="page"] { color: var(--pp-navy); text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 8px; text-decoration-color: var(--pp-teal); }
+
 /* Tabelle */
 .pp-table-wrap { overflow-x: auto; }
 .pp-table { width: 100%; border-collapse: collapse; font-size: 15px; }

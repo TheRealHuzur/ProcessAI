@@ -271,7 +271,7 @@ function router({ db, kern, datenDir }) {
 // Pfade kommen immer aus der Datenbank, nie aus der Anfrage.
 function verwaltung({ db, datenDir }) {
   const q = {
-    liste: db.prepare(`SELECT h.*, m.name AS organisation,
+    liste: db.prepare(`SELECT h.*, m.name AS organisation, COALESCE(m.auswerten, 1) AS auswerten,
                          (SELECT json_group_array(json_object('id', u.id, 'name', u.dateiname)) FROM hb_uploads u WHERE u.vorgang = h.vorgang) AS dateiliste
                        FROM hb_handbuecher h LEFT JOIN mandanten m ON m.id = h.mandant_id
                        ORDER BY h.erstellt DESC LIMIT ?`),

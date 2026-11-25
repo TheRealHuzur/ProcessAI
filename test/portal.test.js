@@ -11,7 +11,7 @@ import { erstellePortal } from "../portal/server.js";
 import { oeffnePortalDatenbank } from "../portal/db.js";
 import { MODULE } from "../portal/module/index.js";
 import { titelAusDateiname, werkzeugAus } from "../portal/module/handbuch/modul.js";
-import { hashePasswort, passwortPasst } from "../konten/index.js";
+import { hashePasswort, passwortPasst, kontokern } from "../konten/index.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const teilprozesse = fs.readFileSync(path.join(__dirname, "fixtures", "teilprozesse.bpmn"), "utf8");
@@ -329,7 +329,7 @@ test("Weiteres Modul ohne Änderung am Kontokern: freischalten, eigene Daten je 
 test("Migrationen je Bereich: erneutes Öffnen ändert nichts, neues Modul kommt dazu", () => {
   const db = oeffnePortalDatenbank(tmp, [...MODULE, notizen]);
   const stand = db.prepare("SELECT bereich, version FROM schema_stand ORDER BY bereich").all().map((z) => [z.bereich, z.version]);
-  assert.deepEqual(stand, [["konten", 1], ["modul:handbuch", 4], ["modul:notizen", 1]]);
+  assert.deepEqual(stand, [["konten", 2], ["modul:handbuch", 4], ["modul:notizen", 1]]);
   db.close();
 });
 
@@ -367,6 +367,58 @@ test("Migration 3 des Logbuchs trägt vorhandene Handbücher nach", () => {
 test("Herkunft aus dem BPMN-Kopf", () => {
   assert.equal(werkzeugAus('<definitions exporter="PICTURE" exporterVersion="3.0.0">'), "PICTURE 3.0.0");
   assert.equal(werkzeugAus("<definitions>"), "");
+});
+
+test("Passwort im Klartext für die Verwaltung: verschlüsselt gespeichert, Abruf im Protokoll", async () => {
+  assert.equal((await amtA(`/api/verwaltung/mandanten/${idA}/passwort`)).status, 401);
+  assert.equal((await admin(`/api/verwaltung/mandanten/${idA}/passwort`)).daten.passwort, "passwort-a1");
+  assert.equal((await admin(`/api/verwaltung/mandanten/${idB}/passwort`)).daten.passwort, "neues-pw-b2", "nach dem Neusetzen");
+  assert.equal((await admin("/api/verwaltung/mandanten/gibtsnicht/passwort")).status, 404);
+  const db = oeffnePortalDatenbank(tmp, [...MODULE, notizen]);
+  const zeile = db.prepare("SELECT passwort_lesbar FROM mandanten WHERE id = ?").get(idA);
+  // Falscher Schlüssel oder kein Schlüssel: nicht lesbar, Anmeldung bleibt unberührt
+  assert.equal(kontokern(db, { schluessel: "anderes-geheimnis" }).passwortAnzeigen(idA), null);
+  assert.equal(kontokern(db).passwortAnzeigen(idA), null);
+  db.prepare("UPDATE mandanten SET passwort_lesbar = '' WHERE id = ?").run(idB);
+  db.close();
+  assert.match(zeile.passwort_lesbar, /^v1\$/);
+  assert.ok(!zeile.passwort_lesbar.includes("passwort-a1"));
+  assert.equal((await admin(`/api/verwaltung/mandanten/${idB}/passwort`)).daten.passwort, null, "alter Zugang ohne lesbare Kopie");
+  const p = (await admin("/api/verwaltung/protokoll")).daten.eintraege;
+  assert.ok(p.some((e) => e.aktion === "verwaltung: passwort angezeigt" && e.mandant_id === idA));
+});
+
+test("Eigener Zugang aus der Auswertung heraus: zählt nur, wenn ausdrücklich gewählt", async () => {
+  const vorher = (await admin("/api/verwaltung/m/handbuch/auswertung?zeitraum=7")).daten.kopf.handbuecher.wert;
+  const aus = await admin(`/api/verwaltung/mandanten/${idA}`, { method: "PATCH", body: { auswerten: false } });
+  assert.equal(aus.daten.mandant.auswerten, false);
+  const p = (await admin("/api/verwaltung/auswertung?zeitraum=7")).daten;
+  assert.ok(!p.mandanten.some((m) => m.id === idA));
+  assert.deepEqual(p.nicht_ausgewertet, ["Stadt A"]);
+  const l = (await admin("/api/verwaltung/m/handbuch/auswertung?zeitraum=7")).daten;
+  assert.ok(l.kopf.handbuecher.wert < vorher);
+  assert.ok(!l.reife.some((r) => r.mandant_id === idA));
+  // Ausdrücklich gewählt: wieder sichtbar
+  const nurA = (await admin(`/api/verwaltung/m/handbuch/auswertung?zeitraum=7&mandant=${idA}`)).daten;
+  assert.ok(nurA.kopf.handbuecher.wert > 0);
+  assert.deepEqual((await admin(`/api/verwaltung/auswertung?zeitraum=7&mandant=${idA}`)).daten.mandanten.map((m) => m.id), [idA]);
+  const liste = (await admin("/api/verwaltung/m/handbuch/handbuecher")).daten.handbuecher;
+  assert.ok(liste.some((h) => h.mandant_id === idA && h.auswerten === 0));
+  // Die Anmeldung des Mandanten bleibt unberührt
+  assert.equal((await amtA("/api/sitzung")).daten.angemeldet, true);
+  await admin(`/api/verwaltung/mandanten/${idA}`, { method: "PATCH", body: { auswerten: true } });
+});
+
+test("Navigation der Verwaltung: Mandanten und Auswertung nebeneinander, aktive Seite markiert", async () => {
+  const mandanten = (await admin("/verwaltung/")).daten.toString();
+  const auswertung = (await admin("/verwaltung/auswertung/")).daten.toString();
+  const nav = (html) => html.match(/<nav class="pp-nav"[\s\S]*?<\/nav>/)[0];
+  for (const html of [mandanten, auswertung]) {
+    assert.deepEqual([...nav(html).matchAll(/>([^<]+)<\/a>/g)].map((m) => m[1]), ["Mandanten", "Auswertung"]);
+    assert.ok(!/class="pp-org">Verwaltung/.test(html), "keine Beschriftung Verwaltung in der Kopfzeile");
+  }
+  assert.match(nav(mandanten), /href="\/verwaltung\/" class="pp-btn pp-btn--text" aria-current="page"/);
+  assert.match(nav(auswertung), /href="\/verwaltung\/auswertung\/" class="pp-btn pp-btn--text" aria-current="page"/);
 });
 
 test("Titel aus Dateiname", () => {

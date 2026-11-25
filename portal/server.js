@@ -17,7 +17,7 @@ const BESUCH_PAUSE_MS = 30 * 60 * 1000;
 
 export function erstellePortal({ db, config, module = MODULE }) {
   pruefeModule(module);
-  const kern = kontokern(db);
+  const kern = kontokern(db, { schluessel: config.sessionSecret });
   const mandantSitzung = sitzungsCookie({ name: "portal_sitzung", geheimnis: config.sessionSecret, tage: config.sitzungTage });
   const adminSitzung = sitzungsCookie({ name: "portal_verwaltung", geheimnis: config.sessionSecret, tage: 1 });
 
@@ -149,13 +149,24 @@ export function erstellePortal({ db, config, module = MODULE }) {
   });
   verwaltung.patch("/mandanten/:id", (req, res) => {
     try {
-      const { name, benutzername, passwort, aktiv } = req.body || {};
-      const mandant = kern.aendern(req.params.id, { name, benutzername, passwort, aktiv });
-      const was = [name !== undefined && "Name", benutzername !== undefined && "Benutzername", passwort && "Passwort", aktiv !== undefined && (aktiv ? "entsperrt" : "gesperrt")].filter(Boolean);
+      const { name, benutzername, passwort, aktiv, auswerten } = req.body || {};
+      const mandant = kern.aendern(req.params.id, { name, benutzername, passwort, aktiv, auswerten: auswerten === undefined ? undefined : Boolean(auswerten) });
+      const was = [name !== undefined && "Name", benutzername !== undefined && "Benutzername", passwort && "Passwort", aktiv !== undefined && (aktiv ? "entsperrt" : "gesperrt"),
+        auswerten !== undefined && (auswerten ? "in Auswertung" : "nicht in Auswertung")].filter(Boolean);
       kern.protokolliere({ mandantId: mandant.id, aktion: "verwaltung: geaendert", details: was.join(", ") });
       return res.json({ mandant });
     } catch (error) {
       return fehler(res, error, "Mandant ändern");
+    }
+  });
+  // Passwort im Klartext (Patrick, 25.11.2026); nur auf Klick in der Verwaltung, jeder Abruf steht im Protokoll
+  verwaltung.get("/mandanten/:id/passwort", (req, res) => {
+    try {
+      const passwort = kern.passwortAnzeigen(req.params.id);
+      kern.protokolliere({ mandantId: req.params.id, aktion: "verwaltung: passwort angezeigt", ergebnis: passwort === null ? "fehler" : "ok" });
+      return res.json({ passwort });
+    } catch (error) {
+      return fehler(res, error, "Passwort anzeigen");
     }
   });
   verwaltung.put("/mandanten/:id/module/:modul", (req, res) => {

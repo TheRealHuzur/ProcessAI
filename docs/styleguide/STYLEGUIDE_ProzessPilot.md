@@ -70,6 +70,9 @@ Feld weiß mit 1 px Rahmen in Linie stark, Radius 8 px; Fokus türkis. Meldungen
 **Arbeitsseiten** (Ergänzung vom 25.11.2026 für Logbuch und Verwaltung)
 Formularseiten mit einer Karte nutzen `.pp-container--narrow` (720 px) für Band und Inhalt, so stehen beide mittig. Formulare und Tabellen liegen auf `.pp-card--plain` (ohne Mindesthöhe, ohne Hover). Dateiablage `.pp-dropzone` gestrichelt wie die Kontaktkarte, Türkis beim Ziehen und nach der Auswahl; das Dateifeld bleibt per Tastatur erreichbar (`.pp-visually-hidden`). Tabellen `.pp-table`, Zwischenüberschriften `.pp-section-title`, Status in Tabellen als `.pp-tag` (Erfolg oder Fehler). Mobil steht der Name der Organisation in der Kopfzeile in einer eigenen Zeile.
 
+**Navigation zwischen Arbeitsseiten** (`.pp-nav`, Ergänzung vom 25.11.2026 für die Verwaltung)
+Textbuttons nebeneinander rechts in der Kopfzeile, ohne Beschriftung davor. Die aktive Seite trägt `aria-current="page"` und ist unterstrichen (2 px Türkis, Schrift Navy).
+
 ## 6. Bewegung und Zustände
 
 - Übergänge 0,2 s, nur Farbe und Schatten. Kein Zoom, kein Hüpfen, keine Daueranimation.

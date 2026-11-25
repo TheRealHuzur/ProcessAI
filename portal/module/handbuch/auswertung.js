@@ -110,7 +110,9 @@ function bestandteileZusammen(handbuecher) {
 
 export function auswertung(db, { zeitraum, mandant = null, jetzt = new Date() } = {}) {
   const z = zeitraumAus(zeitraum, jetzt);
-  const nurMandant = (x) => !mandant || x.mandant_id === mandant;
+  // Mandanten ohne Auswertung (z. B. Patricks eigener Testzugang) zählen nur, wenn sie ausdrücklich gewählt sind
+  const ohne = new Set(db.prepare("SELECT id FROM mandanten WHERE auswerten = 0").all().map((m) => m.id));
+  const nurMandant = (x) => (mandant ? x.mandant_id === mandant : !ohne.has(x.mandant_id));
   const handbuecher = db.prepare(`SELECT h.*, m.name AS organisation FROM hb_handbuecher h
                                   LEFT JOIN mandanten m ON m.id = h.mandant_id ORDER BY h.erstellt`).all()
     .filter(nurMandant).map((h) => ({ ...h, zeit: h.erstellt }));

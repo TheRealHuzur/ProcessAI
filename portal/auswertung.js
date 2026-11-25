@@ -22,10 +22,13 @@ const anzahlMandanten = (liste) => new Set(liste.filter(istAktivitaet).map((e) =
 
 export function portalAuswertung(db, { zeitraum, mandant = null, jetzt = new Date() } = {}) {
   const z = zeitraumAus(zeitraum, jetzt);
-  const alleMandanten = db.prepare("SELECT id, name, benutzername, aktiv, angelegt FROM mandanten ORDER BY name COLLATE NOCASE").all();
+  const alleMandanten = db.prepare("SELECT id, name, benutzername, aktiv, auswerten, angelegt FROM mandanten ORDER BY name COLLATE NOCASE").all();
+  // Mandanten ohne Auswertung (z. B. Patricks eigener Testzugang) zählen nur, wenn sie ausdrücklich gewählt sind
+  const ohne = new Set(alleMandanten.filter((m) => !m.auswerten).map((m) => m.id));
+  const zaehlt = (id) => (mandant ? id === mandant : !ohne.has(id));
   const ereignisse = db.prepare(`SELECT zeit, mandant_id, modul_id, aktion, ergebnis FROM protokoll
                                  WHERE mandant_id IS NOT NULL AND aktion NOT LIKE 'verwaltung:%' ORDER BY zeit`).all()
-    .filter((e) => !mandant || e.mandant_id === mandant);
+    .filter((e) => zaehlt(e.mandant_id));
 
   const kopf = {
     aktive_mandanten: mitVergleich(ereignisse, z, anzahlMandanten),
@@ -47,7 +50,7 @@ export function portalAuswertung(db, { zeitraum, mandant = null, jetzt = new Dat
   }));
 
   const jetztMs = new Date(jetzt).getTime();
-  const mandanten = alleMandanten.filter((m) => !mandant || m.id === mandant).map((m) => {
+  const mandanten = alleMandanten.filter((m) => zaehlt(m.id)).map((m) => {
     const eigene = ereignisse.filter((e) => e.mandant_id === m.id);
     const aktiv = eigene.filter(istAktivitaet);
     const ersteAnmeldung = eigene.find((e) => e.aktion === "anmelden" && e.ergebnis === "ok");
@@ -79,6 +82,7 @@ export function portalAuswertung(db, { zeitraum, mandant = null, jetzt = new Dat
 
   return {
     zeitraum: z,
+    nicht_ausgewertet: mandant ? [] : alleMandanten.filter((m) => ohne.has(m.id)).map((m) => m.name),
     erfasst_ab: ereignisse.length ? ereignisse[0].zeit : null,
     besuche_ab: (ereignisse.find((e) => e.aktion === "besuch") || {}).zeit || null,
     kopf,

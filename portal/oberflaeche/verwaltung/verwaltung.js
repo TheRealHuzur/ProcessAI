@@ -59,12 +59,35 @@
       const sperre = el("button", { class: "pp-btn pp-btn--text", type: "button", text: m.aktiv ? "Sperren" : "Entsperren", onclick: () => {
         aendern(() => api(`${V}/mandanten/${m.id}`, { method: "PATCH", body: { aktiv: !m.aktiv } }), `${m.name} ${m.aktiv ? "gesperrt" : "entsperrt"}.`);
       } });
+      // Passwort im Klartext auf Klick; vor dem 25.11.2026 gesetzte Passwörter gibt es nur als Hash
+      const klar = el("span", { class: "pp-small" });
+      const zeigen = el("button", { class: "pp-btn pp-btn--text", type: "button", text: "Passwort anzeigen", onclick: async () => {
+        if (klar.childNodes.length) {
+          klar.replaceChildren();
+          zeigen.textContent = "Passwort anzeigen";
+          return;
+        }
+        try {
+          const { passwort } = await api(`${V}/mandanten/${m.id}/passwort`);
+          klar.replaceChildren(passwort === null
+            ? document.createTextNode("Nicht lesbar gespeichert. Einmal neu setzen (auch mit dem bisherigen Passwort), dann lesbar.")
+            : el("code", { text: passwort }));
+          zeigen.textContent = "Verbergen";
+        } catch (error) {
+          meldung(error.message, "fehler");
+        }
+      } });
+      const auswerten = el("input", { type: "checkbox", checked: m.auswerten, "aria-label": `${m.name} in der Auswertung zählen` });
+      auswerten.addEventListener("change", () => aendern(
+        () => api(`${V}/mandanten/${m.id}`, { method: "PATCH", body: { auswerten: auswerten.checked } }),
+        `${m.name} ${auswerten.checked ? "zählt wieder in der Auswertung" : "zählt nicht mehr in der Auswertung"}.`));
       body.append(el("tr", { class: m.aktiv ? "" : "gesperrt" },
         el("td", {}, el("strong", { text: m.name }), el("div", { class: "pp-small", text: `angelegt ${datum(m.angelegt)}` })),
         el("td", { text: m.benutzername }),
         el("td", {}, ...modulZelle(m)),
-        el("td", {}, el("div", { class: "passwort-neu" }, pw, pwKnopf)),
-        el("td", {}, el("div", { class: "zugang" }, el("span", { class: `pp-tag pp-tag--${m.aktiv ? "success" : "error"}`, text: m.aktiv ? "aktiv" : "gesperrt" }), sperre))
+        el("td", {}, el("div", { class: "passwort-neu" }, pw, pwKnopf), el("div", { class: "passwort-klar" }, zeigen, klar)),
+        el("td", {}, el("div", { class: "zugang" }, el("span", { class: `pp-tag pp-tag--${m.aktiv ? "success" : "error"}`, text: m.aktiv ? "aktiv" : "gesperrt" }), sperre,
+          el("label", { class: "auswerten" }, auswerten, "in Auswertung")))
       ));
     }
   }

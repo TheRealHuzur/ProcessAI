@@ -1,7 +1,7 @@
 // Kontokern: Mandanten mit genau einem Zugang, freigeschaltete Module je Mandant, Protokoll.
 // Kennt keine Module im Einzelnen; welche es gibt, weiß die App, die den Kern nutzt.
 import crypto from "node:crypto";
-import { hashePasswort, passwortPasst } from "./passwort.js";
+import { hashePasswort, passwortPasst, verschluessele, entschluessele } from "./passwort.js";
 
 // Schema des Kontokerns, als Bereich "konten" fortgezählt (siehe portal/db.js)
 export const KONTEN_MIGRATIONEN = [
@@ -30,7 +30,10 @@ export const KONTEN_MIGRATIONEN = [
      ergebnis TEXT NOT NULL CHECK (ergebnis IN ('ok', 'fehler')),
      details TEXT NOT NULL DEFAULT ''
    );
-   CREATE INDEX idx_protokoll_mandant ON protokoll(mandant_id, id DESC);`
+   CREATE INDEX idx_protokoll_mandant ON protokoll(mandant_id, id DESC);`,
+  // Lesbare (verschlüsselte) Kopie des Passworts für die Verwaltung; Mandant in Auswertungen zählen oder nicht (z. B. eigener Testzugang)
+  `ALTER TABLE mandanten ADD COLUMN passwort_lesbar TEXT NOT NULL DEFAULT '';
+   ALTER TABLE mandanten ADD COLUMN auswerten INTEGER NOT NULL DEFAULT 1;`
 ];
 
 export const LIZENZEN = ["test", "voll"];
@@ -70,12 +73,15 @@ function passwort(wert) {
   return p;
 }
 
-export function kontokern(db) {
+// schluessel: Geheimnis für die lesbare Kopie der Passwörter; ohne Schlüssel wird keine Kopie gespeichert
+export function kontokern(db, { schluessel = "" } = {}) {
+  const lesbar = (pw) => (schluessel ? verschluessele(pw, schluessel) : "");
   const q = {
-    alle: db.prepare("SELECT id, name, benutzername, aktiv, angelegt, geaendert FROM mandanten ORDER BY name COLLATE NOCASE"),
-    eins: db.prepare("SELECT id, name, benutzername, aktiv, angelegt, geaendert FROM mandanten WHERE id = ?"),
+    alle: db.prepare("SELECT id, name, benutzername, aktiv, auswerten, angelegt, geaendert FROM mandanten ORDER BY name COLLATE NOCASE"),
+    eins: db.prepare("SELECT id, name, benutzername, aktiv, auswerten, angelegt, geaendert FROM mandanten WHERE id = ?"),
+    passwortLesbar: db.prepare("SELECT passwort_lesbar FROM mandanten WHERE id = ?"),
     nachName: db.prepare("SELECT * FROM mandanten WHERE benutzername = ?"),
-    anlegen: db.prepare("INSERT INTO mandanten (id, name, benutzername, passwort_hash, aktiv, angelegt, geaendert) VALUES (?, ?, ?, ?, 1, ?, ?)"),
+    anlegen: db.prepare("INSERT INTO mandanten (id, name, benutzername, passwort_hash, passwort_lesbar, aktiv, angelegt, geaendert) VALUES (?, ?, ?, ?, ?, 1, ?, ?)"),
     module: db.prepare("SELECT modul_id, lizenz, seit FROM mandant_module WHERE mandant_id = ? ORDER BY modul_id"),
     modulAn: db.prepare(`INSERT INTO mandant_module (mandant_id, modul_id, lizenz, seit) VALUES (?, ?, ?, ?)
                          ON CONFLICT (mandant_id, modul_id) DO UPDATE SET lizenz = excluded.lizenz`),
@@ -96,7 +102,7 @@ export function kontokern(db) {
       FROM protokoll WHERE mandant_id IS NOT NULL AND modul_id <> '' GROUP BY mandant_id, modul_id, aktion, ergebnis`)
   };
 
-  const mitModulen = (m) => m && ({ ...m, aktiv: Boolean(m.aktiv), module: q.module.all(m.id) });
+  const mitModulen = (m) => m && ({ ...m, aktiv: Boolean(m.aktiv), auswerten: Boolean(m.auswerten), module: q.module.all(m.id) });
 
   function holen(id) {
     const m = mitModulen(q.eins.get(String(id)));
@@ -120,12 +126,12 @@ export function kontokern(db) {
       eindeutig(b);
       const id = crypto.randomUUID();
       const zeit = jetzt();
-      q.anlegen.run(id, n, b, hashePasswort(p), zeit, zeit);
+      q.anlegen.run(id, n, b, hashePasswort(p), lesbar(p), zeit, zeit);
       return holen(id);
     },
 
     // Nur übergebene Felder ändern; Passwort setzt Patrick, es gibt kein Zurücksetzen per Mail
-    aendern(id, { name, benutzername: bn, passwort: pw, aktiv } = {}) {
+    aendern(id, { name, benutzername: bn, passwort: pw, aktiv, auswerten } = {}) {
       const alt = holen(id);
       const felder = [];
       const werte = [];
@@ -135,8 +141,13 @@ export function kontokern(db) {
         eindeutig(b, alt.id);
         felder.push("benutzername = ?"); werte.push(b);
       }
-      if (pw !== undefined && pw !== "") { felder.push("passwort_hash = ?"); werte.push(hashePasswort(passwort(pw))); }
+      if (pw !== undefined && pw !== "") {
+        const p = passwort(pw);
+        felder.push("passwort_hash = ?", "passwort_lesbar = ?");
+        werte.push(hashePasswort(p), lesbar(p));
+      }
       if (aktiv !== undefined) { felder.push("aktiv = ?"); werte.push(aktiv ? 1 : 0); }
+      if (auswerten !== undefined) { felder.push("auswerten = ?"); werte.push(auswerten ? 1 : 0); }
       if (felder.length) {
         db.prepare(`UPDATE mandanten SET ${felder.join(", ")}, geaendert = ? WHERE id = ?`).run(...werte, jetzt(), alt.id);
       }
@@ -162,6 +173,17 @@ export function kontokern(db) {
       const passt = passwortPasst(String(pw ?? ""), m ? m.passwort_hash : LEER_HASH);
       if (!m || !passt || !m.aktiv) return null;
       return holen(m.id);
+    },
+
+    // Passwort im Klartext für die Verwaltung; null, wenn keine lesbare Kopie da ist (vor dem 25.11.2026 gesetzt) oder der Schlüssel nicht passt
+    passwortAnzeigen(id) {
+      const m = holen(id);
+      return schluessel ? entschluessele(q.passwortLesbar.get(m.id).passwort_lesbar, schluessel) : null;
+    },
+
+    // IDs der Mandanten, die in Auswertungen nicht zählen
+    nichtAusgewertet() {
+      return new Set(q.alle.all().filter((m) => !m.auswerten).map((m) => m.id));
     },
 
     // ID des Mandanten zu einem Benutzernamen (auch gesperrt), sonst null; nur fürs Protokoll

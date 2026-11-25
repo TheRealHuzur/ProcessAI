@@ -305,7 +305,7 @@
     const z = p.zeitraum;
     const B = `${V}/m/handbuch`;
     const tagVon = (iso) => new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Berlin" }).format(new Date(iso));
-    const liste = handbuecher.filter((h) => (!zustand.mandant || h.mandant_id === zustand.mandant) && (!z.von || tagVon(h.erstellt) >= z.von));
+    const liste = handbuecher.filter((h) => (zustand.mandant ? h.mandant_id === zustand.mandant : h.auswerten) && (!z.von || tagVon(h.erstellt) >= z.von));
     const inhalt = (h) => {
       if (h.status !== "ok") return [el("div", { text: h.meldung || "ohne Meldung" })];
       if (h.seiten === null) return [el("div", { text: "keine Kennzahlen (vor 25.11.2026)" })];
@@ -335,6 +335,7 @@
     return el("p", { class: "aw-stand" },
       `Gemessen: ${[ab("Protokoll", p.erfasst_ab), ab("Besuche", p.besuche_ab), ab("Handbücher", l.erfasst_ab), ab("Kennzahlen", l.kennzahlen_ab),
         ab("Bestandteile", l.bestandteile_ab), ab("Seitenaufrufe Logbuch", l.seitenaufrufe_ab)].join(" · ")}. `
+      + (p.nicht_ausgewertet.length ? `Nicht ausgewertet (nur einzeln wählbar): ${p.nicht_ausgewertet.join(", ")}. ` : "")
       + "Eine Sitzung ist eine Anmeldung oder ein Besuch mit bestehender Anmeldung (höchstens einer je 30 Minuten). Tage nach deutscher Zeit. "
       + `Stand ${datum(p.zeitraum.jetzt)}.`);
   }
@@ -364,7 +365,7 @@
     const wahl = document.getElementById("aw-mandant");
     if (mandanten) {
       wahl.replaceChildren(el("option", { value: "", text: "Alle Organisationen" }),
-        ...mandanten.map((m) => el("option", { value: m.id, text: m.name, selected: m.id === zustand.mandant })));
+        ...mandanten.map((m) => el("option", { value: m.id, text: m.auswerten ? m.name : `${m.name} (nicht ausgewertet)`, selected: m.id === zustand.mandant })));
     }
   }
 

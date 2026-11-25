@@ -20,6 +20,9 @@
     .passwort-neu .pp-field { min-width: 150px; padding: 6px 10px; }
     .zugang { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
     .gesperrt td { opacity: 0.55; }
+    .passwort-klar { display: flex; align-items: center; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
+    .passwort-klar code { font-size: 14px; background: var(--pp-grey-50); border: 1px solid var(--pp-border); border-radius: var(--pp-radius-sm); padding: 2px 8px; user-select: all; }
+    .auswerten { display: flex; align-items: center; gap: 6px; font-size: 14px; white-space: nowrap; }
     .karten-titel { font-size: 18px; margin-bottom: 14px; }
     @media (max-width: 767px) { .formzeile { grid-template-columns: 1fr; } .formzeile .pp-btn { justify-self: center; } }
   </style>
@@ -31,8 +34,10 @@
     <div class="pp-container pp-header__inner">
       <a href="/verwaltung/" class="pp-wordmark">Prozess<span>Pilot</span></a>
       <div class="pp-header__right" id="kopf-rechts" hidden>
-        <span class="pp-org">Verwaltung</span>
-        <a href="/verwaltung/auswertung/" class="pp-btn pp-btn--text">Auswertung</a>
+        <nav class="pp-nav" aria-label="Verwaltung">
+          <a href="/verwaltung/" class="pp-btn pp-btn--text" aria-current="page">Mandanten</a>
+          <a href="/verwaltung/auswertung/" class="pp-btn pp-btn--text">Auswertung</a>
+        </nav>
         <button type="button" class="pp-btn pp-btn--text" id="btn-abmelden">Abmelden</button>
       </div>
     </div>
@@ -73,7 +78,7 @@
         <h2 class="pp-section-title">Zugänge und Module</h2>
         <div class="pp-card pp-card--plain pp-table-wrap">
           <table class="pp-table">
-            <thead><tr><th>Organisation</th><th>Benutzername</th><th>Module</th><th>Passwort neu setzen</th><th>Zugang</th></tr></thead>
+            <thead><tr><th>Organisation</th><th>Benutzername</th><th>Module</th><th>Passwort</th><th>Zugang</th></tr></thead>
             <tbody id="mandanten"></tbody>
           </table>
         </div>
