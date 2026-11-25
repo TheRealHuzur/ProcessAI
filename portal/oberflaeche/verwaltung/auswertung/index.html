@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Auswertung · ProzessPilot</title>
+  <meta name="robots" content="noindex, nofollow">
+  <!-- Gestaltung nach docs/styleguide/STYLEGUIDE_ProzessPilot.md; Aufbau nach dem AnalyseDESK im WorkDESK -->
+  <link rel="stylesheet" href="/stil/prozesspilot.css">
+  <style>
+    .aw-stapel { display: flex; flex-direction: column; gap: var(--pp-gap); }
+    .aw-zwei { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(420px, 100%), 1fr)); gap: var(--pp-gap); }
+    .aw-drei { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr)); gap: var(--pp-gap); }
+    .pp-card h2.aw-titel { font-size: 20px; }
+    .aw-unter { font-size: 14px; margin-top: -4px; }
+    .aw-leer { font-size: 14px; color: var(--pp-text); opacity: 0.8; }
+
+    /* Auswahl: Zeitraum und Organisation, gilt für die ganze Seite */
+    .aw-auswahl { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px; }
+    .aw-auswahl__links { display: flex; flex-wrap: wrap; align-items: center; gap: 16px; }
+    .aw-schalter { display: inline-flex; border: 1px solid var(--pp-border-field); border-radius: var(--pp-radius); overflow: hidden; }
+    .aw-schalter button {
+      font-family: var(--pp-font-heading); font-weight: 600; font-size: 14px; padding: 9px 16px;
+      background: var(--pp-white); color: var(--pp-navy); border: 0; border-right: 1px solid var(--pp-border-field); cursor: pointer;
+      transition: background var(--pp-transition), color var(--pp-transition);
+    }
+    .aw-schalter button:last-child { border-right: 0; }
+    .aw-schalter button:hover { background: var(--pp-teal-soft); }
+    .aw-schalter button[aria-pressed="true"] { background: var(--pp-teal); color: var(--pp-white); }
+    .aw-auswahl select { width: auto; min-width: 220px; padding: 8px 12px; }
+
+    /* Kopfband mit Kennzahlen */
+    .aw-kopf { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 8px 24px; }
+    .aw-kopf h2 { font-size: 24px; }
+    .aw-kacheln { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; margin-top: 8px; }
+    .pp-table .pp-tag { white-space: nowrap; display: inline-block; }
+    .aw-kachel { border: 1px solid var(--pp-border); border-radius: var(--pp-radius); padding: 14px 16px; display: flex; flex-direction: column; gap: 4px; }
+    .aw-kachel__name { font-family: var(--pp-font-heading); font-weight: 600; font-size: 13px; color: var(--pp-navy); }
+    .aw-kachel__wert { font-family: var(--pp-font-heading); font-weight: 700; font-size: 30px; color: var(--pp-navy); line-height: 1.15; }
+    .aw-kachel__wert--haupt { color: var(--pp-teal-hover); }
+    .aw-kachel__zusatz { font-size: 13px; }
+
+    /* Säulen je Tag oder Woche */
+    .aw-diagramm { display: grid; grid-template-columns: auto 1fr; gap: 0 10px; margin-top: 6px; }
+    .aw-achse { display: flex; flex-direction: column; justify-content: space-between; font-size: 12px; text-align: right; font-variant-numeric: tabular-nums; height: 160px; }
+    .aw-flaeche { position: relative; height: 160px; border-bottom: 1px solid var(--pp-border-field); display: flex; align-items: flex-end; gap: 2px; }
+    .aw-flaeche::before { content: ""; position: absolute; inset: 0 0 auto 0; border-top: 1px dashed var(--pp-border); }
+    .aw-saeule { flex: 1 1 0; min-width: 0; height: 100%; display: flex; flex-direction: column-reverse; gap: 2px; cursor: default; border-radius: 4px 4px 0 0; outline-offset: 1px; }
+    .aw-saeule:hover, .aw-saeule:focus-visible { background: var(--pp-grey-50); }
+    .aw-teil { width: 100%; flex: none; }
+    .aw-teil--oben { border-radius: 4px 4px 0 0; }
+    .aw-teil--ok { background: var(--pp-teal); }
+    .aw-teil--fehler { background: var(--pp-error); }
+    .aw-tage { grid-column: 2; display: flex; justify-content: space-between; font-size: 12px; margin-top: 6px; }
+    .aw-legende { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13px; margin-top: 4px; }
+    .aw-legende span { display: inline-flex; align-items: center; gap: 6px; }
+    .aw-legende i { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
+
+    /* Balkenliste */
+    .aw-liste { display: flex; flex-direction: column; gap: 12px; margin-top: 4px; }
+    .aw-zeile { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; font-size: 14px; }
+    .aw-zeile__name { overflow-wrap: anywhere; color: var(--pp-navy); }
+    .aw-zeile__zahl { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+    .aw-zeile__spur { grid-column: 1 / -1; height: 8px; border-radius: 4px; background: var(--pp-teal-soft); overflow: hidden; }
+    .aw-zeile__spur div { height: 100%; border-radius: 4px; background: var(--pp-teal); }
+    .aw-zeile__klein { grid-column: 1 / -1; font-size: 12.5px; margin-top: -2px; }
+
+    /* Rückmeldungen: ein Ganzes in Teilen */
+    .aw-anteil { display: flex; gap: 2px; height: 10px; margin-top: 6px; }
+    .aw-anteil div { height: 100%; border-radius: 5px; }
+    .aw-zitat { border-left: 3px solid var(--pp-teal-soft); padding: 2px 0 2px 12px; white-space: pre-line; overflow-wrap: anywhere; }
+
+    .aw-tag--neutral { background: var(--pp-grey-50); color: var(--pp-navy); border: 1px solid var(--pp-border); }
+    .aw-tag--hinweis { background: var(--pp-teal-soft); color: var(--pp-teal-hover); }
+    .pp-table td.aw-zahl, .pp-table th.aw-zahl { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+    .aw-meter { width: 90px; height: 6px; border-radius: 3px; background: var(--pp-teal-soft); overflow: hidden; margin-top: 6px; }
+    .aw-meter div { height: 100%; background: var(--pp-teal); border-radius: 3px; }
+    .aw-dateien a { overflow-wrap: anywhere; }
+    details.aw-mehr summary { cursor: pointer; color: var(--pp-teal); font-family: var(--pp-font-heading); font-weight: 600; font-size: 14px; }
+    details.aw-mehr[open] summary { margin-bottom: 12px; }
+    .aw-stand { font-size: 12.5px; line-height: 1.7; }
+
+    .aw-tipp {
+      position: fixed; z-index: 10; pointer-events: none; max-width: 260px;
+      background: var(--pp-white); color: var(--pp-text); border: 1px solid var(--pp-border); border-radius: var(--pp-radius-sm);
+      box-shadow: var(--pp-shadow-card); padding: 8px 10px; font-size: 13px; line-height: 1.45; white-space: pre-line;
+    }
+    @media (max-width: 900px) { .aw-kacheln { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    @media (max-width: 767px) {
+      .aw-auswahl select { min-width: 0; width: 100%; }
+      .aw-auswahl__links, .aw-auswahl__links > * { width: 100%; }
+      .aw-schalter { display: flex; }
+      .aw-schalter button { flex: 1; padding: 9px 6px; }
+    }
+  </style>
+</head>
+<body>
+<div class="pp-page">
+
+  <header class="pp-header">
+    <div class="pp-container pp-header__inner">
+      <a href="/verwaltung/" class="pp-wordmark">Prozess<span>Pilot</span></a>
+      <div class="pp-header__right" id="kopf-rechts" hidden>
+        <span class="pp-org">Verwaltung</span>
+        <a href="/verwaltung/" class="pp-btn pp-btn--text">Mandanten</a>
+        <button type="button" class="pp-btn pp-btn--text" id="btn-abmelden">Abmelden</button>
+      </div>
+    </div>
+  </header>
+
+  <section class="pp-band">
+    <div class="pp-container pp-band__inner">
+      <span class="pp-eyebrow">Verwaltung</span>
+      <h1>Auswertung</h1>
+      <p class="pp-band__lead">Was im Kundenportal passiert: Nutzung, Handbücher, Probleme und Rückmeldungen. Die Kunden sehen davon nichts.</p>
+    </div>
+  </section>
+
+  <main class="pp-main">
+    <div class="pp-container aw-stapel">
+      <section class="pp-card pp-card--plain">
+        <div class="aw-auswahl">
+          <div class="aw-auswahl__links">
+            <div class="aw-schalter" id="aw-zeitraeume" role="group" aria-label="Zeitraum"></div>
+            <select class="pp-field" id="aw-mandant" aria-label="Organisation"></select>
+          </div>
+          <button type="button" class="pp-btn pp-btn--text" id="aw-export" title="Alle Werte der Auswahl als JSON-Datei, z. B. für Claude">Daten exportieren</button>
+        </div>
+        <div id="aw-meldung" hidden></div>
+      </section>
+      <div id="aw-inhalt" class="aw-stapel" aria-live="polite"></div>
+    </div>
+  </main>
+
+  <footer class="pp-footer">
+    <div class="pp-container pp-footer__inner">
+      <img src="/stil/logo-wissen-und-werkzeug.png" alt="Wissen und Werkzeug" width="150" height="50">
+      <span>Testversion</span>
+    </div>
+  </footer>
+</div>
+<div class="aw-tipp" id="aw-tipp" role="tooltip" hidden></div>
+<script src="/portal.js"></script>
+<script src="auswertung.js"></script>
+</body>
+</html>

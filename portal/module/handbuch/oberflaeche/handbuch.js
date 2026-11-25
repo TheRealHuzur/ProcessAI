@@ -9,6 +9,61 @@
   const eingabe = document.getElementById("datei");
   let dateien = [];
 
+  // Rückmeldung „Passt das Handbuch?“ nach jedem erstellten Handbuch
+  const rm = {
+    karte: document.getElementById("rueckmeldung"),
+    knoepfe: document.getElementById("rm-knoepfe"),
+    form: document.getElementById("rm-form"),
+    label: document.getElementById("rm-label"),
+    text: document.getElementById("rm-text"),
+    meldung: (text, art) => zeigeMeldung(document.getElementById("rm-meldung"), text, art),
+    vorgang: "",
+    passt: null
+  };
+
+  function zeigeRueckmeldung(vorgang) {
+    rm.vorgang = vorgang || "";
+    rm.passt = null;
+    rm.karte.hidden = !rm.vorgang;
+    rm.knoepfe.hidden = false;
+    rm.form.hidden = true;
+    rm.text.value = "";
+    rm.meldung("");
+  }
+
+  async function sendeRueckmeldung(text = "") {
+    await api("/api/m/handbuch/rueckmeldung", { method: "POST", body: { vorgang: rm.vorgang, passt: rm.passt, text } });
+  }
+
+  async function waehleAntwort(passt) {
+    rm.passt = passt;
+    try {
+      await sendeRueckmeldung();
+      rm.knoepfe.hidden = true;
+      rm.label.textContent = passt ? "Möchten Sie noch etwas ergänzen? (freiwillig)" : "Was sollten wir verbessern? (freiwillig)";
+      rm.form.hidden = false;
+      rm.meldung("Vielen Dank für Ihre Rückmeldung.", "ok");
+      rm.text.focus();
+    } catch (error) {
+      rm.meldung(`Die Rückmeldung konnte nicht gesendet werden: ${error.message}`, "fehler");
+    }
+  }
+
+  document.getElementById("rm-ja").addEventListener("click", () => waehleAntwort(true));
+  document.getElementById("rm-nein").addEventListener("click", () => waehleAntwort(false));
+  rm.form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const text = rm.text.value.trim();
+    if (!text) return;
+    try {
+      await sendeRueckmeldung(text);
+      rm.form.hidden = true;
+      rm.meldung("Vielen Dank, Ihr Hinweis ist angekommen.", "ok");
+    } catch (error) {
+      rm.meldung(`Der Hinweis konnte nicht gesendet werden: ${error.message}`, "fehler");
+    }
+  });
+
   function pruefeKnopf() {
     knopf.disabled = !dateien.length || !titelFeld.value.trim();
   }
@@ -49,6 +104,7 @@
     knopf.disabled = true;
     knopf.textContent = "Handbuch wird erstellt ...";
     meldung("");
+    zeigeRueckmeldung("");
     try {
       const inhalte = await Promise.all(dateien.map(async (d) => ({ name: d.name, inhalt: await d.text() })));
       const res = await fetch("/api/m/handbuch/erstellen", {
@@ -67,6 +123,7 @@
       }
       speichere(await res.blob(), `${titel.replace(/[\\/:*?"<>|]/g, "").trim() || "Prozess"} Handbuch.pdf`);
       meldung("Das Handbuch ist erstellt und wird heruntergeladen.", "ok");
+      zeigeRueckmeldung(res.headers.get("X-Vorgang"));
     } catch (error) {
       meldung(`Das Handbuch konnte nicht erstellt werden: ${error.message}`, "fehler");
     } finally {

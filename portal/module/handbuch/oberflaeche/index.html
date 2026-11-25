@@ -10,6 +10,14 @@
   <style>
     .erstellen .pp-card__action { padding-top: 20px; }
     .erstellen .pp-message { margin-top: 16px; }
+    .rueckmeldung { margin-top: 28px; }
+    .rueckmeldung h2 { font-size: 24px; margin: 0 0 6px; }
+    .rueckmeldung p { margin: 0; }
+    .rm-knoepfe { display: flex; gap: 14px; flex-wrap: wrap; margin-top: 18px; }
+    .rm-hinweis { margin-top: 18px; }
+    .rm-hinweis textarea { min-height: 110px; resize: vertical; font: inherit; }
+    .rm-hinweis .pp-btn { margin-top: 14px; }
+    .rueckmeldung .pp-message { margin-top: 16px; }
   </style>
 </head>
 <body>
@@ -51,6 +59,21 @@
         </div>
         <div id="meldung" hidden></div>
       </form>
+
+      <section class="pp-card pp-card--plain rueckmeldung" id="rueckmeldung" aria-labelledby="rm-frage" hidden>
+        <h2 id="rm-frage">Passt das Handbuch?</h2>
+        <p class="pp-small">Ihre Rückmeldung hilft uns, das Logbuch zu verbessern.</p>
+        <div class="rm-knoepfe" id="rm-knoepfe">
+          <button class="pp-btn pp-btn--primary" type="button" id="rm-ja">Ja, passt</button>
+          <button class="pp-btn pp-btn--primary" type="button" id="rm-nein">Nicht ganz</button>
+        </div>
+        <form class="pp-form rm-hinweis" id="rm-form" hidden>
+          <label class="pp-label" for="rm-text" id="rm-label">Was sollten wir verbessern? (freiwillig)</label>
+          <textarea class="pp-field" id="rm-text" maxlength="2000"></textarea>
+          <button class="pp-btn pp-btn--primary" type="submit" id="rm-senden">Hinweis senden</button>
+        </form>
+        <div id="rm-meldung" hidden></div>
+      </section>
     </div>
   </main>
 

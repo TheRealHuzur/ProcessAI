@@ -8,12 +8,14 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import express from "express";
-import { leseHandbuch, pdfAusGliederung, HandbuchFehler } from "../../../kern/handbuch/index.js";
+import { leseHandbuch, pdfAusGliederung, bestandteile, HandbuchFehler } from "../../../kern/handbuch/index.js";
+import { auswertung } from "./auswertung.js";
 
 const MAX_GROESSE = "30mb";
 const MAX_DATEIEN = 20;
 const MAX_DATEINAME = 150;
 const MAX_TITEL = 150;
+const MAX_RUECKMELDUNG = 2000;
 const ERSTELLT_MIT = "Erstellt mit dem ProzessPilot von Wissen und Werkzeug";
 const FUSSHINWEIS = "Wissen und Werkzeug";
 
@@ -58,7 +60,20 @@ const MIGRATIONEN = [
    CREATE INDEX idx_hb_handbuecher_mandant ON hb_handbuecher(mandant_id, erstellt);
    INSERT INTO hb_handbuecher (vorgang, mandant_id, titel, dateien, upload_groesse, status, meldung, erstellt)
      SELECT vorgang, mandant_id, MAX(titel), COUNT(*), SUM(groesse), MAX(status), MAX(meldung), MIN(hochgeladen)
-     FROM hb_uploads GROUP BY vorgang, mandant_id;`
+     FROM hb_uploads GROUP BY vorgang, mandant_id;`,
+  // Auswertung: Prüfsumme je Datei (Wiederholungen), Textlänge der Arbeitshilfen, Bestandteile, Rückmeldung des Kunden
+  `ALTER TABLE hb_uploads ADD COLUMN inhalt_hash TEXT NOT NULL DEFAULT '';
+   ALTER TABLE hb_handbuecher ADD COLUMN arbeitshilfe_zeichen INTEGER;
+   ALTER TABLE hb_handbuecher ADD COLUMN bestandteile TEXT NOT NULL DEFAULT '';
+   CREATE TABLE hb_rueckmeldungen (
+     id INTEGER PRIMARY KEY AUTOINCREMENT,
+     vorgang TEXT NOT NULL REFERENCES hb_handbuecher(vorgang),
+     mandant_id TEXT NOT NULL REFERENCES mandanten(id),
+     passt INTEGER NOT NULL CHECK (passt IN (0, 1)),
+     text TEXT NOT NULL DEFAULT '',
+     zeit TEXT NOT NULL
+   );
+   CREATE INDEX idx_hb_rueckmeldungen_vorgang ON hb_rueckmeldungen(vorgang, id);`
 ];
 
 class EingabeFehler extends Error {}
@@ -81,22 +96,29 @@ export function titelAusDateiname(dateiname) {
   return dateiname.replace(/\.(bpmn|xml)$/i, "").replace(/_+/g, " ").replace(/\s+/g, " ").trim();
 }
 
-// Herkunft der Datei laut BPMN-Kopf (exporter), z. B. PICTURE, ADONIS, Camunda Modeler
+// Herkunft der Datei laut BPMN-Kopf (exporter), sonst nach Namensraum (ADONIS schreibt keinen exporter)
+const NAMENSRAEUME = [[/boc-group\.com/i, "ADONIS"], [/picture-gmbh\.de/i, "PICTURE"], [/camunda\.org/i, "Camunda"],
+  [/signavio\.com/i, "Signavio"], [/bizagi\.com/i, "Bizagi"], [/prozesspilot\.wissen-und-werkzeug\.de/i, "ProzessPilot"]];
 export function werkzeugAus(xml) {
   const kopf = String(xml || "").slice(0, 4000);
   const name = (kopf.match(/\bexporter\s*=\s*"([^"]*)"/) || [])[1] || "";
   const version = (kopf.match(/\bexporterVersion\s*=\s*"([^"]*)"/) || [])[1] || "";
-  return bereinigt(`${name} ${version}`).slice(0, 80);
+  if (name) return bereinigt(`${name} ${version}`).slice(0, 80);
+  const treffer = NAMENSRAEUME.find(([muster]) => muster.test(kopf));
+  return treffer ? treffer[1] : "";
 }
 
 // Kennzahlen aus der Gliederung: wie vollständig ist das Wissen am Modell
 export function kennzahlen(gliederung) {
-  const z = { kapitel: gliederung.kapitel.length, schritte: 0, mit_arbeitshilfe: 0, mit_angaben: 0, fehlende_unterdiagramme: 0 };
+  const z = { kapitel: gliederung.kapitel.length, schritte: 0, mit_arbeitshilfe: 0, arbeitshilfe_zeichen: 0, mit_angaben: 0, fehlende_unterdiagramme: 0 };
   const zaehle = (eintraege) => {
     for (const e of eintraege) {
       if (e.art !== "bahn") {
         z.schritte += 1;
-        if (e.arbeitshilfe) z.mit_arbeitshilfe += 1;
+        if (e.arbeitshilfe) {
+          z.mit_arbeitshilfe += 1;
+          z.arbeitshilfe_zeichen += e.arbeitshilfe.length;
+        }
         if (Object.values(e.wissen || {}).some((w) => Array.isArray(w) && w.length)) z.mit_angaben += 1;
         if (e.hinweis) z.fehlende_unterdiagramme += 1;
       }
@@ -117,11 +139,14 @@ function datumHeute() {
 }
 
 function router({ db, kern, datenDir }) {
-  const ablegen = db.prepare(`INSERT INTO hb_uploads (id, vorgang, mandant_id, dateiname, titel, datei, groesse, status, meldung, hochgeladen)
-                              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+  const ablegen = db.prepare(`INSERT INTO hb_uploads (id, vorgang, mandant_id, dateiname, titel, datei, groesse, status, meldung, hochgeladen, inhalt_hash)
+                              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
   const vermerken = db.prepare(`INSERT INTO hb_handbuecher (vorgang, mandant_id, titel, dateien, upload_groesse, werkzeug, status, meldung,
-                                  pdf, pdf_groesse, seiten, kapitel, schritte, mit_arbeitshilfe, mit_angaben, fehlende_unterdiagramme, dauer_ms, erstellt)
-                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+                                  pdf, pdf_groesse, seiten, kapitel, schritte, mit_arbeitshilfe, mit_angaben, fehlende_unterdiagramme, dauer_ms, erstellt,
+                                  arbeitshilfe_zeichen, bestandteile)
+                                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
+  const ablegenRueckmeldung = db.prepare("INSERT INTO hb_rueckmeldungen (vorgang, mandant_id, passt, text, zeit) VALUES (?, ?, ?, ?, ?)");
+  const eigenesHandbuch = db.prepare("SELECT status FROM hb_handbuecher WHERE vorgang = ? AND mandant_id = ?");
   const r = express.Router();
 
   // Erwartet JSON { titel, dateien: [{ name, inhalt }] }; inhalt ist der Text der BPMN-Datei
@@ -193,16 +218,24 @@ function router({ db, kern, datenDir }) {
       }
     }
     const werkzeug = [...new Set(dateien.map((d) => werkzeugAus(d.inhalt)).filter(Boolean))].join(", ").slice(0, 200);
+    // Bestandteile auch bei Fehlern: gerade dann ist interessant, was in der Datei steckt
+    let teile = "";
+    try {
+      teile = JSON.stringify(await bestandteile(dateien.map((d) => d.inhalt)));
+    } catch (error) {
+      console.error("Bestandteile nicht ermittelt:", error);
+    }
     try {
       vermerken.run(vorgang, req.mandant.id, titel, dateien.length, dateien.reduce((s, d) => s + Buffer.byteLength(d.inhalt), 0), werkzeug, status, meldung,
         pdfRelativ, pdf ? pdf.length : 0, pdf ? seitenImPdf(pdf) : null, zahlen.kapitel ?? null, zahlen.schritte ?? null, zahlen.mit_arbeitshilfe ?? null,
-        zahlen.mit_angaben ?? null, zahlen.fehlende_unterdiagramme ?? null, dauer, zeit);
+        zahlen.mit_angaben ?? null, zahlen.fehlende_unterdiagramme ?? null, dauer, zeit, zahlen.arbeitshilfe_zeichen ?? null, teile);
     } catch (error) {
       console.error("Handbuch nicht vermerkt:", error);
     }
     for (const d of abgelegt) {
       try {
-        ablegen.run(d.id, vorgang, req.mandant.id, d.name, titel, d.relativ, Buffer.byteLength(d.inhalt), status, meldung, zeit);
+        ablegen.run(d.id, vorgang, req.mandant.id, d.name, titel, d.relativ, Buffer.byteLength(d.inhalt), status, meldung, zeit,
+          crypto.createHash("sha256").update(d.inhalt).digest("hex"));
       } catch (error) {
         console.error("Upload nicht vermerkt:", error);
       }
@@ -214,7 +247,21 @@ function router({ db, kern, datenDir }) {
     const datei = `${titel.replace(/[^\p{L}\p{N} _-]/gu, "").trim() || "Prozess"} Handbuch.pdf`;
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `attachment; filename="handbuch.pdf"; filename*=UTF-8''${encodeURIComponent(datei)}`);
+    // Für die Rückmeldung „Passt das Handbuch?“ (gleiche Herkunft, kein CORS nötig)
+    res.setHeader("X-Vorgang", vorgang);
     return res.send(Buffer.from(pdf));
+  });
+
+  // Rückmeldung zum eigenen, erfolgreich erstellten Handbuch: { vorgang, passt, text }. Jede bleibt erhalten, die letzte gilt.
+  r.post("/rueckmeldung", express.json({ limit: "20kb" }), (req, res) => {
+    const vorgang = String((req.body && req.body.vorgang) || "");
+    const h = eigenesHandbuch.get(vorgang, req.mandant.id);
+    if (!h || h.status !== "ok") return res.status(404).json({ fehler: "Handbuch nicht gefunden." });
+    if (typeof req.body.passt !== "boolean") return res.status(400).json({ fehler: "Bitte Ja oder Nein wählen." });
+    const text = String(req.body.text || "").replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, "").trim().slice(0, MAX_RUECKMELDUNG);
+    ablegenRueckmeldung.run(vorgang, req.mandant.id, req.body.passt ? 1 : 0, text, new Date().toISOString());
+    kern.protokolliere({ mandantId: req.mandant.id, modulId: "handbuch", aktion: "rueckmeldung", details: req.body.passt ? "passt" : "passt nicht" });
+    return res.json({ ok: true });
   });
 
   return r;
@@ -246,6 +293,9 @@ function verwaltung({ db, datenDir }) {
   r.get("/handbuecher/:vorgang/pdf", (req, res) => {
     const h = q.pdf.get(String(req.params.vorgang));
     return senden(res, h && h.pdf, `${(h && h.titel) || "Handbuch"}.pdf`, "application/pdf");
+  });
+  r.get("/auswertung", (req, res) => {
+    res.json(auswertung(db, { zeitraum: req.query.zeitraum, mandant: req.query.mandant ? String(req.query.mandant) : null }));
   });
   r.get("/dateien/:id", (req, res) => {
     const d = q.datei.get(String(req.params.id));

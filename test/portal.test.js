@@ -140,6 +140,7 @@ test("Logbuch: Datei und Titel rein, PDF raus; jede Datei bleibt im Hintergrund 
   assert.equal(pdf.headers.get("content-type"), "application/pdf");
   assert.match(pdf.headers.get("content-disposition"), /Rechnung%20bezahlen%20in%20der%20Stadtkasse%20Handbuch\.pdf/);
   assert.equal(pdf.daten.subarray(0, 5).toString(), "%PDF-");
+  assert.match(pdf.headers.get("x-vorgang"), /^[0-9a-f-]{36}$/, "Vorgang für die Rückmeldung");
   // Gleicher Name noch einmal: wieder ein PDF, nichts wird ersetzt oder angezeigt
   assert.equal((await erstelle(amtA, teilprozesse, "Rechnung_bezahlen.bpmn")).status, 200);
   const kaputt = await erstelle(amtA, "<kein bpmn", "Kaputt.bpmn", "Kaputt");
@@ -210,6 +211,8 @@ test("Logbuch im Hintergrund: PDF abgelegt, Kennzahlen je Handbuch, Auswertung n
   assert.deepEqual([fehler.pdf, fehler.seiten], ["", null]);
   assert.match(fehler.meldung, /kein gültiges BPMN/);
   assert.equal(zeilen[4].werkzeug, "PICTURE 3.0.0");
+  for (const z of zeilen.filter((x) => x.status === "ok")) assert.ok(z.arbeitshilfe_zeichen >= 0 && JSON.parse(z.bestandteile).genutzt);
+  assert.ok(JSON.parse(fehler.bestandteile), "Bestandteile auch bei Fehlern (soweit lesbar)");
   assert.ok(zeilen[0].mit_arbeitshilfe <= zeilen[0].schritte);
 
   // Kunde sieht nichts davon
@@ -265,6 +268,48 @@ test("Besuch mit bestehender Sitzung wird mitgeschrieben, höchstens einmal je 3
   assert.equal(zaehle(), vorher + 1);
 });
 
+test("Rückmeldung „Passt das Handbuch?“ nur zum eigenen, erfolgreichen Handbuch", async () => {
+  const erstellt = await amtA("/api/m/handbuch/erstellen", { method: "POST", body: { titel: "Rückmeldung", dateien: [{ name: "r.bpmn", inhalt: teilprozesse }] } });
+  const vorgang = erstellt.headers.get("x-vorgang");
+  const senden = (client, body) => client("/api/m/handbuch/rueckmeldung", { method: "POST", body });
+  assert.equal((await senden(amtA, { vorgang, passt: true })).status, 200);
+  assert.equal((await senden(amtA, { vorgang, passt: false, text: "Schritte fehlen\nund mehr" })).status, 200);
+  assert.equal((await senden(amtA, { vorgang, passt: "ja" })).status, 400);
+  assert.equal((await senden(amtB, { vorgang, passt: true })).status, 404, "fremdes Handbuch");
+  const db = oeffnePortalDatenbank(tmp, [...MODULE, notizen]);
+  const fehlerVorgang = db.prepare("SELECT vorgang FROM hb_handbuecher WHERE status = 'fehler' AND mandant_id = ?").get(idA).vorgang;
+  const zeilen = db.prepare("SELECT passt, text FROM hb_rueckmeldungen WHERE vorgang = ? ORDER BY id").all(vorgang).map((z) => [z.passt, z.text]);
+  db.close();
+  assert.equal((await senden(amtA, { vorgang: fehlerVorgang, passt: true })).status, 404, "nur zu erfolgreichen Handbüchern");
+  assert.deepEqual(zeilen, [[1, ""], [0, "Schritte fehlen\nund mehr"]]);
+  assert.equal((await amtA("/api/verwaltung/m/handbuch/auswertung")).status, 401);
+  const l = (await admin("/api/verwaltung/m/handbuch/auswertung?zeitraum=7")).daten;
+  assert.equal(l.rueckmeldungen.liste[0].text, "Schritte fehlen\nund mehr");
+  assert.equal(l.kopf.passt_nicht.wert, 1);
+});
+
+test("Aufruf der Logbuch-Seite wird mitgeschrieben, höchstens einmal je 30 Minuten; Auswertung nur für die Verwaltung", async () => {
+  const zaehle = () => {
+    const db = oeffnePortalDatenbank(tmp, [...MODULE, notizen]);
+    const n = db.prepare("SELECT COUNT(*) AS n FROM protokoll WHERE mandant_id = ? AND modul_id = 'handbuch' AND aktion = 'seite'").get(idB).n;
+    db.close();
+    return n;
+  };
+  const vorher = zaehle();
+  assert.equal((await amtB("/m/handbuch/")).status, 200);
+  await amtB("/m/handbuch/");
+  await amtB("/m/handbuch/handbuch.js");
+  assert.equal(zaehle(), vorher + 1);
+  assert.equal((await amtB("/api/verwaltung/auswertung")).status, 401);
+  const p = await admin("/api/verwaltung/auswertung?zeitraum=7");
+  assert.equal(p.status, 200);
+  assert.ok(p.daten.kopf.aktive_mandanten.wert >= 2);
+  assert.equal(p.daten.tage.length, 7);
+  const seite = await admin("/verwaltung/auswertung/");
+  assert.equal(seite.status, 200);
+  assert.match(seite.daten.toString(), /<h1>Auswertung<\/h1>/);
+});
+
 test("Weiteres Modul ohne Änderung am Kontokern: freischalten, eigene Daten je Mandant", async () => {
   assert.equal((await amtA("/api/m/notizen")).status, 403);
   await admin(`/api/verwaltung/mandanten/${idA}/module/notizen`, { method: "PUT", body: { an: true } });
@@ -284,7 +329,7 @@ test("Weiteres Modul ohne Änderung am Kontokern: freischalten, eigene Daten je 
 test("Migrationen je Bereich: erneutes Öffnen ändert nichts, neues Modul kommt dazu", () => {
   const db = oeffnePortalDatenbank(tmp, [...MODULE, notizen]);
   const stand = db.prepare("SELECT bereich, version FROM schema_stand ORDER BY bereich").all().map((z) => [z.bereich, z.version]);
-  assert.deepEqual(stand, [["konten", 1], ["modul:handbuch", 3], ["modul:notizen", 1]]);
+  assert.deepEqual(stand, [["konten", 1], ["modul:handbuch", 4], ["modul:notizen", 1]]);
   db.close();
 });
 

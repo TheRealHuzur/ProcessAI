@@ -6,6 +6,7 @@ import { kontokern, sitzungsCookie, gleich, KontenFehler, LIZENZEN } from "../ko
 import { leseKonfiguration, ROOT_DIR } from "./config.js";
 import { oeffnePortalDatenbank } from "./db.js";
 import { MODULE, pruefeModule } from "./module/index.js";
+import { portalAuswertung } from "./auswertung.js";
 
 const OBERFLAECHE = path.join(ROOT_DIR, "portal", "oberflaeche");
 // Gemeinsame Stilvorlage (Styleguide, Schriften, Logo, Icons), auch ohne Anmeldung für die Anmeldeseite
@@ -30,13 +31,15 @@ export function erstellePortal({ db, config, module = MODULE }) {
     next();
   });
 
-  // Im Hintergrund: Besuche je Mandant mitschreiben (nur im Speicher gedrosselt, nach Neustart zählt der nächste Aufruf neu)
+  // Im Hintergrund: Besuche je Mandant und Aufrufe von Modulseiten mitschreiben (nur im Speicher gedrosselt,
+  // nach einem Neustart zählt der nächste Aufruf neu)
   const letzterBesuch = new Map();
-  const merkeBesuch = (mandant, aktion) => {
+  const merkeBesuch = (mandant, aktion, modulId = "") => {
     const jetzt = Date.now();
-    if (aktion === "besuch" && jetzt - (letzterBesuch.get(mandant.id) || 0) < BESUCH_PAUSE_MS) return;
-    letzterBesuch.set(mandant.id, jetzt);
-    if (aktion === "besuch") kern.protokolliere({ mandantId: mandant.id, aktion: "besuch" });
+    const schluessel = `${mandant.id}:${modulId}`;
+    if (aktion !== "anmelden" && jetzt - (letzterBesuch.get(schluessel) || 0) < BESUCH_PAUSE_MS) return;
+    letzterBesuch.set(schluessel, jetzt);
+    if (aktion !== "anmelden") kern.protokolliere({ mandantId: mandant.id, modulId, aktion });
   };
   const angemeldet = (req) => {
     const id = mandantSitzung.lesen(req);
@@ -98,6 +101,8 @@ export function erstellePortal({ db, config, module = MODULE }) {
     const seite = (req, res, next) => {
       const mandant = angemeldet(req);
       if (!mandant || !kern.hatModul(mandant.id, modul.id)) return res.redirect(302, "/");
+      // Aufruf der Modulseite (für Abbrüche: geöffnet, aber nichts erstellt)
+      if (req.path === "/" || req.path === "/index.html") merkeBesuch(mandant, "seite", modul.id);
       return next();
     };
     const datenDir = path.join(config.dataDir, "module", modul.id);
@@ -165,6 +170,9 @@ export function erstellePortal({ db, config, module = MODULE }) {
     }
   });
   verwaltung.get("/nutzung", (req, res) => res.json({ mandanten: kern.nutzung() }));
+  verwaltung.get("/auswertung", (req, res) => {
+    res.json(portalAuswertung(db, { zeitraum: req.query.zeitraum, mandant: req.query.mandant ? String(req.query.mandant) : null }));
+  });
   // Auswertung je Modul (optionaler Steckbrief-Eintrag verwaltung), Daten wie beim Modul selbst
   for (const modul of module) {
     if (typeof modul.verwaltung === "function") {
