@@ -5,62 +5,65 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Logbuch · ProzessPilot</title>
   <meta name="robots" content="noindex, nofollow">
-  <link rel="stylesheet" href="/portal.css">
+  <!-- Gestaltung nach docs/styleguide/STYLEGUIDE_ProzessPilot.md -->
+  <link rel="stylesheet" href="/stil/prozesspilot.css">
   <style>
-    /* Inhalt mittig: Breite der Karte plus Seitenabstand von main */
-    main { max-width: 652px; }
-    .ablage {
-      display: block;
-      border: 2px dashed var(--border);
-      border-radius: 12px;
-      padding: 28px 16px;
-      text-align: center;
-      background: var(--surface-2);
-      cursor: pointer;
-      margin: 0;
-      font-size: 15px;
-      font-weight: 400;
-      color: var(--text);
-    }
-    .ablage.ueber { border-color: var(--sky); background: rgba(2, 132, 199, 0.06); }
-    .ablage.gewaehlt { border-style: solid; border-color: var(--sky); }
-    .ablage strong { display: block; font-size: 16px; margin-bottom: 4px; overflow-wrap: anywhere; }
-    .ablage p { margin: 0; color: var(--text-muted); font-size: 14px; overflow-wrap: anywhere; }
-    .erstellen .btn-primaer { width: 100%; margin-top: 18px; padding: 11px 14px; font-size: 15px; }
+    .erstellen .pp-card__action { padding-top: 20px; }
+    .erstellen .pp-message { margin-top: 16px; }
   </style>
 </head>
 <body>
-  <header class="kopf">
-    <a class="marke" href="/">Prozess<span>Pilot</span></a>
-    <div class="kopf-rechts">
-      <span id="mandant-name"></span>
-      <a class="btn btn-zweit btn-klein" href="/">Übersicht</a>
-      <button class="btn btn-zweit btn-klein" id="btn-abmelden" type="button">Abmelden</button>
+<div class="pp-page">
+
+  <header class="pp-header">
+    <div class="pp-container pp-header__inner">
+      <a href="/" class="pp-wordmark">Prozess<span>Pilot</span></a>
+      <div class="pp-header__right">
+        <span class="pp-org" id="mandant-name"></span>
+        <a href="/" class="pp-btn pp-btn--text">Übersicht</a>
+        <button type="button" class="pp-btn pp-btn--text" id="btn-abmelden">Abmelden</button>
+      </div>
     </div>
   </header>
 
-  <main>
-    <h1>Logbuch</h1>
-    <p class="unterzeile">BPMN-Datei hochladen, Titel eingeben, Handbuch erstellen.</p>
+  <section class="pp-band">
+    <div class="pp-container pp-container--narrow pp-band__inner">
+      <span class="pp-eyebrow">Logbuch</span>
+      <h1>Handbuch erstellen</h1>
+      <p class="pp-band__lead">BPMN-Datei hochladen, Titel eingeben, Handbuch erstellen.</p>
+    </div>
+  </section>
 
-    <form class="karte erstellen" id="form-erstellen">
-      <label class="ablage" id="ablage" for="datei">
-        <strong id="ablage-titel">BPMN-Datei hier ablegen oder auswählen</strong>
-        <p id="ablage-text">Export aus ADONIS, PICTURE oder einem anderen Werkzeug, Endung .bpmn oder .xml. Auch mehrere Dateien, etwa Haupt- und Unterdiagramme.</p>
-      </label>
-      <input type="file" id="datei" accept=".bpmn,.xml" multiple hidden>
+  <main class="pp-main">
+    <div class="pp-container pp-container--narrow">
+      <form class="pp-card pp-card--plain pp-form erstellen" id="form-erstellen">
+        <label class="pp-dropzone" id="ablage" for="datei">
+          <strong id="ablage-titel">BPMN-Datei hier ablegen oder auswählen</strong>
+          <p id="ablage-text">Export aus ADONIS, PICTURE oder einem anderen Werkzeug, Endung .bpmn oder .xml. Auch mehrere Dateien, etwa Haupt- und Unterdiagramme.</p>
+          <input type="file" id="datei" accept=".bpmn,.xml" multiple class="pp-visually-hidden">
+        </label>
 
-      <label for="titel">Titel des Handbuchs</label>
-      <input type="text" id="titel" maxlength="150" placeholder="z. B. Antrag auf Teilzeit bearbeiten" required>
+        <label class="pp-label" for="titel">Titel des Handbuchs</label>
+        <input class="pp-field" type="text" id="titel" maxlength="150" placeholder="z. B. Antrag auf Teilzeit bearbeiten" required>
 
-      <button class="btn btn-primaer" id="btn-erstellen" type="submit" disabled>Handbuch erstellen</button>
-      <div class="meldung" id="meldung" hidden></div>
-    </form>
+        <div class="pp-card__action">
+          <button class="pp-btn pp-btn--primary" id="btn-erstellen" type="submit" disabled>Handbuch erstellen</button>
+        </div>
+        <div id="meldung" hidden></div>
+      </form>
+    </div>
   </main>
 
-  <div class="fuss">Wissen und Werkzeug · Testversion</div>
+  <footer class="pp-footer">
+    <div class="pp-container pp-footer__inner">
+      <img src="/stil/logo-wissen-und-werkzeug.png" alt="Wissen und Werkzeug" width="150" height="50">
+      <span>Testversion</span>
+    </div>
+  </footer>
 
-  <script src="/portal.js"></script>
-  <script src="handbuch.js"></script>
+</div>
+
+<script src="/portal.js"></script>
+<script src="handbuch.js"></script>
 </body>
 </html>

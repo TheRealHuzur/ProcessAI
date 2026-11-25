@@ -5,70 +5,100 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Verwaltung · ProzessPilot</title>
   <meta name="robots" content="noindex, nofollow">
-  <link rel="stylesheet" href="/portal.css">
+  <!-- Gestaltung nach docs/styleguide/STYLEGUIDE_ProzessPilot.md -->
+  <link rel="stylesheet" href="/stil/prozesspilot.css">
   <style>
-    .formzeile { display: grid; grid-template-columns: repeat(3, 1fr) auto; gap: 12px; align-items: end; }
-    .formzeile label { margin-top: 0; }
-    .modul-wahl { display: flex; align-items: center; gap: 6px; margin: 2px 0; font-size: 14px; white-space: nowrap; }
-    .modul-wahl select { width: auto; padding: 2px 6px; font-size: 13px; }
-    .passwort-neu { display: flex; gap: 6px; }
-    .passwort-neu input { min-width: 140px; }
+    .anmeldung { max-width: 440px; }
+    .anmeldung .pp-btn { align-self: center; margin-top: 18px; }
+    .pp-message { margin-top: 14px; }
+    .formzeile { display: grid; grid-template-columns: repeat(3, 1fr) auto; gap: 14px; align-items: end; }
+    .formzeile .pp-label { margin-top: 0; display: block; margin-bottom: 6px; }
+    .modul-wahl { display: flex; align-items: center; gap: 8px; margin: 2px 0 6px; white-space: nowrap; }
+    .modul-wahl label { display: flex; align-items: center; gap: 6px; }
+    .modul-wahl .pp-field { width: auto; padding: 4px 8px; font-size: 14px; }
+    .passwort-neu { display: flex; align-items: center; gap: 10px; }
+    .passwort-neu .pp-field { min-width: 150px; padding: 6px 10px; }
+    .zugang { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
     .gesperrt td { opacity: 0.55; }
-    @media (max-width: 760px) { .formzeile { grid-template-columns: 1fr; } }
+    .karten-titel { font-size: 18px; margin-bottom: 14px; }
+    @media (max-width: 767px) { .formzeile { grid-template-columns: 1fr; } .formzeile .pp-btn { justify-self: center; } }
   </style>
 </head>
 <body>
-  <header class="kopf">
-    <a class="marke" href="/verwaltung/">Prozess<span>Pilot</span> · Verwaltung</a>
-    <div class="kopf-rechts" id="kopf-rechts" hidden>
-      <button class="btn btn-zweit btn-klein" id="btn-abmelden" type="button">Abmelden</button>
+<div class="pp-page">
+
+  <header class="pp-header">
+    <div class="pp-container pp-header__inner">
+      <a href="/verwaltung/" class="pp-wordmark">Prozess<span>Pilot</span></a>
+      <div class="pp-header__right" id="kopf-rechts" hidden>
+        <span class="pp-org">Verwaltung</span>
+        <button type="button" class="pp-btn pp-btn--text" id="btn-abmelden">Abmelden</button>
+      </div>
     </div>
   </header>
 
-  <main>
-    <section class="karte anmeldung" id="anmeldung" hidden>
-      <h1>Verwaltung</h1>
-      <form id="form-anmelden">
-        <label for="admin-passwort">Passwort</label>
-        <input type="password" id="admin-passwort" autocomplete="current-password" required>
-        <button class="btn btn-primaer" type="submit">Anmelden</button>
-        <div class="meldung" id="meldung-anmelden" hidden></div>
-      </form>
-    </section>
+  <section class="pp-band">
+    <div class="pp-container pp-band__inner">
+      <span class="pp-eyebrow">Verwaltung</span>
+      <h1 id="band-titel"></h1>
+      <p class="pp-band__lead" id="band-einleitung"></p>
+    </div>
+  </section>
 
-    <section id="inhalt" hidden>
-      <h1>Mandanten</h1>
-      <p class="unterzeile">Jeder Mandant hat genau einen Zugang. Das Passwort legen Sie fest; es gibt kein Zurücksetzen per Mail.</p>
+  <main class="pp-main">
+    <div class="pp-container">
 
-      <div class="karte">
-        <form id="form-neu" class="formzeile">
-          <div><label for="neu-name">Organisation</label><input type="text" id="neu-name" required></div>
-          <div><label for="neu-benutzer">Benutzername</label><input type="text" id="neu-benutzer" autocomplete="off" required></div>
-          <div><label for="neu-passwort">Passwort (mind. 8 Zeichen)</label><input type="text" id="neu-passwort" autocomplete="off" required></div>
-          <button class="btn btn-primaer" type="submit">Anlegen</button>
+      <section class="pp-card pp-card--plain anmeldung" id="anmeldung" aria-label="Anmeldung" hidden>
+        <form class="pp-form" id="form-anmelden">
+          <label class="pp-label" for="admin-passwort">Passwort</label>
+          <input class="pp-field" type="password" id="admin-passwort" autocomplete="current-password" required>
+          <button class="pp-btn pp-btn--primary" type="submit">Anmelden</button>
+          <div id="meldung-anmelden" hidden></div>
         </form>
-        <div class="meldung" id="meldung" hidden></div>
-      </div>
+      </section>
 
-      <h2>Zugänge und Module</h2>
-      <div class="karte tabelle-rahmen">
-        <table>
-          <thead><tr><th>Organisation</th><th>Benutzername</th><th>Module</th><th>Passwort neu setzen</th><th>Zugang</th></tr></thead>
-          <tbody id="mandanten"></tbody>
-        </table>
-      </div>
+      <section id="inhalt" hidden>
+        <div class="pp-card pp-card--plain">
+          <h2 class="karten-titel">Mandant anlegen</h2>
+          <form id="form-neu" class="formzeile">
+            <div><label class="pp-label" for="neu-name">Organisation</label><input class="pp-field" type="text" id="neu-name" required></div>
+            <div><label class="pp-label" for="neu-benutzer">Benutzername</label><input class="pp-field" type="text" id="neu-benutzer" autocomplete="off" required></div>
+            <div><label class="pp-label" for="neu-passwort">Passwort (mind. 8 Zeichen)</label><input class="pp-field" type="text" id="neu-passwort" autocomplete="off" required></div>
+            <button class="pp-btn pp-btn--primary" type="submit">Anlegen</button>
+          </form>
+          <div id="meldung" hidden></div>
+        </div>
 
-      <h2>Protokoll</h2>
-      <div class="karte tabelle-rahmen">
-        <table>
-          <thead><tr><th>Zeit</th><th>Organisation</th><th>Modul</th><th>Aktion</th><th>Ergebnis</th><th>Angaben</th></tr></thead>
-          <tbody id="protokoll"></tbody>
-        </table>
-      </div>
-    </section>
+        <h2 class="pp-section-title">Zugänge und Module</h2>
+        <div class="pp-card pp-card--plain pp-table-wrap">
+          <table class="pp-table">
+            <thead><tr><th>Organisation</th><th>Benutzername</th><th>Module</th><th>Passwort neu setzen</th><th>Zugang</th></tr></thead>
+            <tbody id="mandanten"></tbody>
+          </table>
+        </div>
+
+        <h2 class="pp-section-title">Protokoll</h2>
+        <div class="pp-card pp-card--plain pp-table-wrap">
+          <table class="pp-table">
+            <thead><tr><th>Zeit</th><th>Organisation</th><th>Modul</th><th>Aktion</th><th>Ergebnis</th><th>Angaben</th></tr></thead>
+            <tbody id="protokoll"></tbody>
+          </table>
+        </div>
+      </section>
+
+    </div>
   </main>
 
-  <script src="/portal.js"></script>
-  <script src="verwaltung.js"></script>
+  <footer class="pp-footer">
+    <div class="pp-container pp-footer__inner">
+      <img src="/stil/logo-wissen-und-werkzeug.png" alt="Wissen und Werkzeug" width="150" height="50">
+      <span>Testversion</span>
+    </div>
+  </footer>
+
+</div>
+
+<script src="/portal.js"></script>
+<script src="verwaltung.js"></script>
 </body>
 </html>

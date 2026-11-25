@@ -8,7 +8,7 @@
   <!-- Design C3 nach docs/styleguide/STYLEGUIDE_ProzessPilot.md; Schriften lokal, keine Google-Server -->
   <link rel="stylesheet" href="/stil/prozesspilot.css">
   <style>
-    .anmeldung { max-width: 440px; min-height: 0; }
+    .anmeldung { max-width: 440px; }
     .anmeldung .pp-btn { align-self: center; margin-top: 18px; }
     .anmeldung .pp-message { margin-top: 12px; }
   </style>
@@ -37,7 +37,7 @@
   <main class="pp-main">
     <div class="pp-container">
 
-      <section class="pp-card anmeldung" id="anmeldung" aria-label="Anmeldung" hidden>
+      <section class="pp-card pp-card--plain anmeldung" id="anmeldung" aria-label="Anmeldung" hidden>
         <form class="pp-form" id="form-anmelden">
           <label class="pp-label" for="benutzername">Benutzername</label>
           <input class="pp-field" type="text" id="benutzername" autocomplete="username" required>

@@ -254,3 +254,12 @@ test("Jedes Modul nennt ein vorhandenes Icon und einen Buttontext", () => {
     assert.ok(new RegExp(`\\b${m.icon}: '`).test(icons), `${m.id}: Icon ${m.icon} fehlt in kern/stil/icons.js`);
   }
 });
+
+test("Alle Seiten des Portals nutzen die zentrale Stilvorlage", () => {
+  const seiten = ["portal/oberflaeche/index.html", "portal/oberflaeche/verwaltung/index.html", "portal/module/handbuch/oberflaeche/index.html"];
+  for (const seite of seiten) {
+    const html = fs.readFileSync(path.join(__dirname, "..", seite), "utf8");
+    assert.ok(html.includes('href="/stil/prozesspilot.css"'), seite);
+    assert.ok(!html.includes("/portal.css"), `${seite} lädt noch die alte Vorlage`);
+  }
+});

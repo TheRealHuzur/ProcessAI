@@ -67,6 +67,9 @@ Linien-Icons im Lucide-Stil (24er-Raster, 2 px Strich, einfarbig Türkis). Empfe
 **Formulare und Meldungen** (`.pp-form`, `.pp-label`, `.pp-field`, `.pp-message`, Ergänzung vom 25.11.2026 für die Anmeldung)
 Feld weiß mit 1 px Rahmen in Linie stark, Radius 8 px; Fokus türkis. Meldungen in Erfolg- oder Fehlerfarbe, Radius 4 px.
 
+**Arbeitsseiten** (Ergänzung vom 25.11.2026 für Logbuch und Verwaltung)
+Formularseiten mit einer Karte nutzen `.pp-container--narrow` (720 px) für Band und Inhalt, so stehen beide mittig. Formulare und Tabellen liegen auf `.pp-card--plain` (ohne Mindesthöhe, ohne Hover). Dateiablage `.pp-dropzone` gestrichelt wie die Kontaktkarte, Türkis beim Ziehen und nach der Auswahl; das Dateifeld bleibt per Tastatur erreichbar (`.pp-visually-hidden`). Tabellen `.pp-table`, Zwischenüberschriften `.pp-section-title`, Status in Tabellen als `.pp-tag` (Erfolg oder Fehler). Mobil steht der Name der Organisation in der Kopfzeile in einer eigenen Zeile.
+
 ## 6. Bewegung und Zustände
 
 - Übergänge 0,2 s, nur Farbe und Schatten. Kein Zoom, kein Hüpfen, keine Daueranimation.

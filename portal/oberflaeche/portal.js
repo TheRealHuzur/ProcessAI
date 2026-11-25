@@ -26,10 +26,12 @@
     return daten;
   }
 
+  // Meldung nach Styleguide: art "fehler" oder "ok"
   function zeigeMeldung(el, text, art = "fehler") {
     if (!el) return;
     el.textContent = text || "";
-    el.className = `meldung ${art}`;
+    el.className = `pp-message pp-message--${art === "ok" ? "success" : "error"}`;
+    el.setAttribute("role", art === "ok" ? "status" : "alert");
     el.hidden = !text;
   }
 

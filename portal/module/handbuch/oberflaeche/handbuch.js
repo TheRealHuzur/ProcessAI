@@ -23,7 +23,7 @@
     const neu = [...(liste || [])].sort((a, b) => a.name.localeCompare(b.name, "de"));
     if (!neu.length) return;
     dateien = neu;
-    ablage.classList.add("gewaehlt");
+    ablage.classList.add("pp-dropzone--selected");
     document.getElementById("ablage-titel").textContent = neu.length === 1 ? neu[0].name : `${neu.length} Dateien ausgewählt`;
     document.getElementById("ablage-text").textContent = `${neu.length > 1 ? `${neu.map((d) => d.name).join(", ")}. ` : ""}Andere Auswahl? Hier ablegen oder klicken.`;
     if (!titelFeld.value.trim()) titelFeld.value = titelVorschlag(neu[0].name);
@@ -80,11 +80,11 @@
     waehle(eingabe.files);
     eingabe.value = "";
   });
-  ablage.addEventListener("dragover", (e) => { e.preventDefault(); ablage.classList.add("ueber"); });
-  ablage.addEventListener("dragleave", () => ablage.classList.remove("ueber"));
+  ablage.addEventListener("dragover", (e) => { e.preventDefault(); ablage.classList.add("pp-dropzone--over"); });
+  ablage.addEventListener("dragleave", () => ablage.classList.remove("pp-dropzone--over"));
   ablage.addEventListener("drop", (e) => {
     e.preventDefault();
-    ablage.classList.remove("ueber");
+    ablage.classList.remove("pp-dropzone--over");
     waehle(e.dataTransfer.files);
   });
   document.getElementById("btn-abmelden").addEventListener("click", abmelden);

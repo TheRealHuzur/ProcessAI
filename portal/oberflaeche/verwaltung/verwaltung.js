@@ -32,14 +32,14 @@
     return module.map((modul) => {
       const frei = mandant.module.find((x) => x.modul_id === modul.id);
       const haken = el("input", { type: "checkbox", checked: Boolean(frei), "aria-label": `${modul.name} für ${mandant.name}` });
-      const lizenz = el("select", { "aria-label": "Lizenz", disabled: !frei }, ...lizenzen.map((l) => el("option", { value: l, selected: frei && frei.lizenz === l, text: l === "test" ? "Test" : "Voll" })));
+      const lizenz = el("select", { class: "pp-field", "aria-label": `Lizenz ${modul.name} für ${mandant.name}`, disabled: !frei }, ...lizenzen.map((l) => el("option", { value: l, selected: frei && frei.lizenz === l, text: l === "test" ? "Test" : "Voll" })));
       const setzen = () => aendern(
         () => api(`${V}/mandanten/${mandant.id}/module/${modul.id}`, { method: "PUT", body: { an: haken.checked, lizenz: lizenz.value } }),
         `${modul.name} für ${mandant.name} ${haken.checked ? "freigeschaltet" : "gesperrt"}.`
       );
       haken.addEventListener("change", setzen);
       lizenz.addEventListener("change", setzen);
-      return el("div", { class: "modul-wahl" }, el("label", { class: "modul-wahl", style: "margin:0;color:inherit;font-weight:400" }, haken, modul.name), lizenz);
+      return el("div", { class: "modul-wahl" }, el("label", {}, haken, modul.name), lizenz);
     });
   }
 
@@ -47,24 +47,24 @@
     const body = document.getElementById("mandanten");
     body.replaceChildren();
     if (!liste.length) {
-      body.append(el("tr", {}, el("td", { colspan: 5, class: "leer", text: "Noch keine Mandanten angelegt." })));
+      body.append(el("tr", {}, el("td", { colspan: 5, class: "pp-small", text: "Noch keine Mandanten angelegt." })));
       return;
     }
     for (const m of liste) {
-      const pw = el("input", { type: "text", autocomplete: "off", placeholder: "neues Passwort", "aria-label": `Neues Passwort für ${m.name}` });
-      const pwKnopf = el("button", { class: "btn btn-zweit btn-klein", type: "button", text: "Setzen", onclick: () => {
+      const pw = el("input", { class: "pp-field", type: "text", autocomplete: "off", placeholder: "neues Passwort", "aria-label": `Neues Passwort für ${m.name}` });
+      const pwKnopf = el("button", { class: "pp-btn pp-btn--text", type: "button", text: "Setzen", onclick: () => {
         if (!pw.value) return;
         aendern(() => api(`${V}/mandanten/${m.id}`, { method: "PATCH", body: { passwort: pw.value } }), `Passwort für ${m.name} gesetzt.`);
       } });
-      const sperre = el("button", { class: "btn btn-zweit btn-klein", type: "button", text: m.aktiv ? "Sperren" : "Entsperren", onclick: () => {
+      const sperre = el("button", { class: "pp-btn pp-btn--text", type: "button", text: m.aktiv ? "Sperren" : "Entsperren", onclick: () => {
         aendern(() => api(`${V}/mandanten/${m.id}`, { method: "PATCH", body: { aktiv: !m.aktiv } }), `${m.name} ${m.aktiv ? "gesperrt" : "entsperrt"}.`);
       } });
       body.append(el("tr", { class: m.aktiv ? "" : "gesperrt" },
-        el("td", {}, el("strong", { text: m.name }), el("div", { class: "klein", text: `angelegt ${datum(m.angelegt)}` })),
+        el("td", {}, el("strong", { text: m.name }), el("div", { class: "pp-small", text: `angelegt ${datum(m.angelegt)}` })),
         el("td", { text: m.benutzername }),
         el("td", {}, ...modulZelle(m)),
         el("td", {}, el("div", { class: "passwort-neu" }, pw, pwKnopf)),
-        el("td", {}, el("div", { class: m.aktiv ? "status-ok" : "status-fehler", text: m.aktiv ? "aktiv" : "gesperrt" }), sperre)
+        el("td", {}, el("div", { class: "zugang" }, el("span", { class: `pp-tag pp-tag--${m.aktiv ? "success" : "error"}`, text: m.aktiv ? "aktiv" : "gesperrt" }), sperre))
       ));
     }
   }
@@ -73,22 +73,28 @@
     const body = document.getElementById("protokoll");
     body.replaceChildren();
     if (!eintraege.length) {
-      body.append(el("tr", {}, el("td", { colspan: 6, class: "leer", text: "Noch keine Einträge." })));
+      body.append(el("tr", {}, el("td", { colspan: 6, class: "pp-small", text: "Noch keine Einträge." })));
       return;
     }
     for (const e of eintraege.slice(0, 100)) {
       body.append(el("tr", {},
-        el("td", { class: "klein", text: datum(e.zeit) }),
+        el("td", { class: "pp-small", text: datum(e.zeit) }),
         el("td", { text: e.mandant_id ? mandantNamen.get(e.mandant_id) || "?" : "" }),
         el("td", { text: e.modul_id || "" }),
         el("td", { text: e.aktion }),
-        el("td", { class: e.ergebnis === "ok" ? "status-ok" : "status-fehler", text: e.ergebnis === "ok" ? "ok" : "Fehler" }),
-        el("td", { class: "klein", text: e.details })
+        el("td", {}, el("span", { class: `pp-tag pp-tag--${e.ergebnis === "ok" ? "success" : "error"}`, text: e.ergebnis === "ok" ? "ok" : "Fehler" })),
+        el("td", { class: "pp-small", text: e.details })
       ));
     }
   }
 
+  function band(titel, einleitung) {
+    document.getElementById("band-titel").textContent = titel;
+    document.getElementById("band-einleitung").textContent = einleitung;
+  }
+
   function zeigeInhalt() {
+    band("Mandanten", "Jeder Mandant hat genau einen Zugang. Das Passwort legen Sie fest; es gibt kein Zurücksetzen per Mail.");
     document.getElementById("anmeldung").hidden = true;
     document.getElementById("inhalt").hidden = false;
     document.getElementById("kopf-rechts").hidden = false;
@@ -96,6 +102,7 @@
   }
 
   function zeigeAnmeldung(eingerichtet = true) {
+    band("Anmelden", "Melden Sie sich mit dem Passwort der Verwaltung an.");
     document.getElementById("inhalt").hidden = true;
     document.getElementById("kopf-rechts").hidden = true;
     document.getElementById("anmeldung").hidden = false;
